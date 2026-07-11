@@ -2,3 +2,5 @@
 node_modules
 crontabs/*.db
 crontabs/logs/*.log
+test-results/
+playwright-report/

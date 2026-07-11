@@ -29,7 +29,7 @@ db.loadDatabase((err) => {
 });
 
 if (!fs.existsSync(logFolder)) {
-  fs.mkdirSync(logFolder);
+  fs.mkdirSync(logFolder, { recursive: true });
 }
 
 function buildCrontab(name, command, schedule, stopped, logging, mailing) {
@@ -69,7 +69,9 @@ function makeCommand(tab) {
   }
 
   if (tab.mailing && JSON.stringify(tab.mailing) !== '{}') {
-    result += `; /usr/local/bin/node ${__dirname}/bin/crontab-ui-mailer.js ${tab._id} ${stdout} ${stderr}`;
+    const nodeBin = process.env.NODE_BIN || process.execPath;
+    const mailerScript = path.join(__dirname, 'bin', 'crontab-ui-mailer.js');
+    result += `; ${nodeBin} ${mailerScript} ${tab._id} ${stdout} ${stderr}`;
   }
 
   return result;

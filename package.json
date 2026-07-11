@@ -1,7 +1,7 @@
 {
-  "name": "crontab-ui",
-  "version": "0.4.2",
-  "description": "Easy and safe way to manage your crontab file",
+  "name": "cron-gui",
+  "version": "0.5.0",
+  "description": "Modern UI for managing your crontab file",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
@@ -34,6 +34,7 @@
     "node": ">=20.0.0"
   },
   "bin": {
+    "cron-gui": "bin/crontab-ui.js",
     "crontab-ui": "bin/crontab-ui.js",
     "crontab-ui-mailer": "bin/crontab-ui-mailer.js"
   },
@@ -43,7 +44,8 @@
   },
   "keywords": [
     "Crontab",
-    "node"
+    "node",
+    "cron-gui"
   ],
   "author": "Suresh Alse",
   "license": "MIT"

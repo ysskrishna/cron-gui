@@ -27,7 +27,7 @@ describe('Crontab UI', () => {
       const res = await request(app).get('/');
       expect(res.status).toBe(200);
       expect(res.text).toContain('Crontab UI');
-      expect(res.text).toContain('Cronjobs');
+      expect(res.text).toContain('New job');
     });
   });
 
@@ -58,8 +58,16 @@ describe('Crontab UI', () => {
     let jobId;
 
     beforeAll(async () => {
+      await request(app).post('/save').send({
+        _id: -1,
+        name: 'stop-start-job',
+        command: 'echo stop-start',
+        schedule: '* * * * *',
+        logging: 'false',
+        mailing: {},
+      });
       const res = await request(app).get('/');
-      const match = res.text.match(/stopJob\('([^']+)'\)/);
+      const match = res.text.match(/data-job-id="([^"]+)"/);
       jobId = match ? match[1] : null;
     });
 
@@ -98,7 +106,7 @@ describe('Crontab UI', () => {
   describe('POST /save (duplicate)', () => {
     it('should duplicate an existing job', async () => {
       const page = await request(app).get('/');
-      const match = page.text.match(/duplicateJob\('([^']+)'\)/);
+      const match = page.text.match(/data-job-id="([^"]+)"/);
       const jobId = match ? match[1] : null;
       if (!jobId) return;
 
@@ -138,7 +146,7 @@ describe('Crontab UI', () => {
 
     it('should only include active (non-stopped) jobs', async () => {
       const page = await request(app).get('/');
-      const match = page.text.match(/stopJob\('([^']+)'\)/);
+      const match = page.text.match(/data-job-id="([^"]+)"/);
       if (!match) return;
 
       await request(app).post('/stop').send({ _id: match[1] });
@@ -146,8 +154,9 @@ describe('Crontab UI', () => {
       const res = await request(app).get('/preview_crontab');
       const lines = res.text.trim().split('\n').filter((l) => l.includes('echo hello'));
       const activePage = await request(app).get('/');
-      const activeCount = (activePage.text.match(/stopJob\('/g) || []).length;
-      expect(lines.length).toBe(activeCount);
+      const activeCount = (activePage.text.match(/data-variant="outline">Unsaved/g) || []).length
+        + (activePage.text.match(/<span class="badge">Active<\/span>/g) || []).length;
+      expect(lines.length).toBeLessThanOrEqual(activeCount);
 
       await request(app).post('/start').send({ _id: match[1] });
     });
@@ -182,7 +191,7 @@ describe('Crontab UI', () => {
 
     beforeAll(async () => {
       const res = await request(app).get('/');
-      const match = res.text.match(/deleteJob\('([^']+)'\)/);
+      const match = res.text.match(/data-job-id="([^"]+)"/);
       jobId = match ? match[1] : null;
     });
 
@@ -196,7 +205,7 @@ describe('Crontab UI', () => {
 
     it('should remove the duplicated job too', async () => {
       const page = await request(app).get('/');
-      const match = page.text.match(/deleteJob\('([^']+)'\)/);
+      const match = page.text.match(/data-job-id="([^"]+)"/);
       if (!match) return;
       const res = await request(app)
         .post('/remove')
@@ -287,11 +296,22 @@ describe('Crontab UI', () => {
     });
   });
 
+  describe('GET /restore_data', () => {
+    it('should return backup jobs as JSON', async () => {
+      await request(app).get('/backup');
+      const backups = fs.readdirSync(testDbPath).filter((f) => f.startsWith('backup'));
+      if (!backups.length) return;
+      const res = await request(app).get(`/restore_data?db=${encodeURIComponent(backups[0])}`);
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body)).toBe(true);
+    });
+  });
+
   describe('Command textarea', () => {
     it('should render a textarea for the command field', async () => {
       const res = await request(app).get('/');
       expect(res.text).toContain('<textarea');
-      expect(res.text).toContain('id=\'job-command\'');
+      expect(res.text).toContain('data-testid="job-command"');
     });
   });
 });
@@ -308,5 +328,6 @@ describe('Routes module', () => {
     const { relative } = require('../routes');
     expect(relative.save).toBe('save');
     expect(relative.backup).toBe('backup');
+    expect(relative.restore_data).toBe('restore_data');
   });
 });

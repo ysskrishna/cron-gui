@@ -20,6 +20,7 @@ const routes = {
   logger: '/logger',
   stdout: '/stdout',
   preview_crontab: '/preview_crontab',
+  restore_data: '/restore_data',
 };
 
 exports.base_url = baseUrl;

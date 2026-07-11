@@ -1,140 +1,303 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Crontab UI</title>
-<link href="css/bootstrap.min.css" rel="stylesheet">
-<link href="css/bootstrap-icons.min.css" rel="stylesheet">
-<link href="css/dataTables.bootstrap5.min.css" rel="stylesheet">
-<script src="js/jquery.min.js"></script>
-<script src="js/bootstrap.bundle.min.js"></script>
-<script src="js/dataTables.min.js"></script>
-<script src="js/dataTables.bootstrap5.min.js"></script>
-<script src="script.js"></script>
-<script src="mailconfig.js"></script>
-<script type="text/javascript">
-	var crontabs = [];
-	var routes = [];
-	document.addEventListener('DOMContentLoaded', function() {
-		var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-		tooltipTriggerList.map(function (el) { return new bootstrap.Tooltip(el); });
-		crontabs = JSON.parse('<%- crontabs.replace(/\\\\/g, "\\\\\\\\").replace(/\\\"/g,"\\\\\"").replace(/\'/g,"\\\'").replace(/\\t/g, " ") %>');
-		routes = JSON.parse('<%- routes %>');
-		$("#env_vars").val(`<%- env  %>`);
-	});
-</script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Crontab UI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/basecoat-css@1.0.2/dist/basecoat-nova.cdn.min.css" />
+  <link rel="stylesheet" href="css/app.css" />
 </head>
 <body>
-<%- include('navbar.ejs') -%>
-<div class="container-fluid">
-	<h2>Cronjobs</h2>
-	<div class="mb-3">
-		<label for="env_vars" class="form-label">Environment Variables:</label>
-		<textarea class="form-control" rows="3" id="env_vars" placeholder="# Please set PATH, MAILTO, HOME... here"></textarea>
-	</div>
-	<div class="mb-3">
-		<a class="btn btn-primary" onclick="newJob();"><i class="bi bi-plus-circle"></i> New</a>
-		<a class="btn btn-info" onclick="doBackup();"><i class="bi bi-download"></i> Backup</a>
-		<form id="import_form" enctype="multipart/form-data" action="<%= JSON.parse(routes).import %>" method="post" style="display:none">
-			<input type="file" id="import_file" name="import_file" onchange="$('#import_form').submit()"/>
-		</form>
-		<a class="btn btn-warning" onclick="import_db()"><i class="bi bi-box-arrow-in-down"></i> Import</a>
-		<a class="btn btn-warning" href="<%= JSON.parse(routes).export %>"><i class="bi bi-box-arrow-up"></i> Export</a>
-		<a class="btn btn-success" onclick="getCrontab();"><i class="bi bi-arrow-down-circle"></i> Get from crontab</a>
-		<a class="btn btn-success" onclick="setCrontab();"><i class="bi bi-save"></i> Save to crontab</a>
-		<a class="btn btn-outline-secondary" onclick="previewCrontab();"><i class="bi bi-code-square"></i> Preview crontab</a>
-	</div>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-icon" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </span>
+        <span>Crontab UI</span>
+      </div>
+      <div class="topbar-actions">
+        <button type="button" class="btn" data-variant="ghost" data-size="icon-sm" aria-label="Settings" title="Environment variables (PATH, MAILTO, etc.) — stored in env.db, separate from jobs" onclick="document.getElementById('settings-drawer').showModal()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+        <button type="button" id="theme-toggle" class="btn" data-variant="ghost" data-size="icon-sm" aria-label="Toggle theme" title="Toggle light/dark theme">
+          <svg id="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          <svg id="theme-icon-moon" class="hidden" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+        </button>
+        <a class="github-link" href="https://github.com/alseambusher/crontab-ui" target="_blank" rel="noreferrer">GitHub</a>
+      </div>
+    </header>
 
-	<table class="table table-striped" id="main_table">
-		<thead>
-	<tr>
-		<th>#</th>
-		<th>Name</th>
-		<th>Job</th>
-		<th>Time</th>
-		<th>Last Modified</th>
-		<th></th>
-	</tr>
-</thead>
-<tbody>
-	<% var index = 1 %>
-	<% JSON.parse(crontabs).forEach(function(crontab){ %>
-		<% if (!crontab.stopped) { %>
-			<tr>
-		<% } else { %>
-			<tr class="table-primary">
-		<% } %>
-				<td>
-					<%= index %>.
-					<% index += 1 %>
-				</td>
+    <div class="list-toolbar">
+      <div class="list-toolbar-actions">
+        <button type="button" class="btn" data-size="sm" data-testid="new-job-btn" title="Add a new scheduled job" onclick="App.openNewJob()">New job</button>
+        <button type="button" class="btn" data-variant="outline" data-size="sm" title="Deploy env vars and enabled jobs to the system crontab" data-testid="save-crontab-btn" onclick="App.confirmSaveToCrontab()">Save to crontab</button>
+        <div id="actions-menu" class="dropdown-menu">
+          <button type="button" id="actions-trigger" aria-haspopup="menu" aria-controls="actions-menu-list" aria-expanded="false" class="btn" data-variant="outline" data-size="sm" title="System crontab sync, server backups, and database import/export">Actions</button>
+          <div data-popover aria-hidden="true" class="w-52">
+            <div role="menu" id="actions-menu-list" aria-labelledby="actions-trigger"></div>
+          </div>
+        </div>
+        <form id="import-form" enctype="multipart/form-data" action="<%= JSON.parse(routes).import %>" method="post" class="hidden-input"><input type="file" id="import-file" name="import_file" accept=".db,application/octet-stream" /></form>
+      </div>
+      <div class="list-toolbar-filters">
+        <input type="search" id="search-input" class="input" placeholder="Search jobs..." />
+        <select id="status-filter" class="input" aria-label="Filter by status">
+          <option value="all">All</option>
+          <option value="active">Active</option>
+          <option value="unsaved">Unsaved</option>
+          <option value="error">Error</option>
+          <option value="disabled">Disabled</option>
+        </select>
+        <button type="button" id="clear-filters-btn" class="btn hidden" data-variant="outline" data-size="sm" title="Clear search and status filter" onclick="App.clearFilters()">Clear filters</button>
+      </div>
+    </div>
 
-				<td>
-					<% if (crontab.name) { %>
-						<%= crontab.name %>
-						<a class="btn btn-sm" data-bs-toggle="tooltip" data-bs-placement="right" title="<%= crontab._id %>"><i class="bi bi-info-circle"></i></a>
-						<% if (crontab.saved) { %>
-							<i class="bi bi-check-circle text-success"></i>
-						<% } else { %>
-							<a data-bs-toggle="tooltip" data-bs-placement="right" title="'Save to crontab' to deploy">
-								<i class="bi bi-exclamation-circle text-warning"></i>
-							</a>
-						<% } %>
-					<% } else { %>
-						<%= crontab._id %>
-					<% } %>
-				</td>
-				<td><%= crontab.command %></td>
-				<td>
-					<span style="cursor:pointer" data-bs-toggle="tooltip" data-bs-placement="bottom" title="<%= crontab.next %>">
-							<%= crontab.schedule %>
-					</span>
-					<a class="btn btn-sm" data-bs-toggle="tooltip" data-bs-placement="right" title="<%= crontab.human %>">
-						<i class="bi bi-info-circle"></i>
-					</a>
-				</td>
-				<td style="width:20%" title="<%= crontab.timestamp %>"><%= dayjs(new Date(crontab.timestamp)).fromNow() %></td>
-				<td>
+    <div class="table-panel">
+      <div id="bulk-bar" class="bulk-bar hidden">
+        <span id="bulk-count">0 selected</span>
+        <button type="button" class="btn" data-variant="outline" data-size="sm" onclick="App.bulkEnable()">Enable</button>
+        <button type="button" class="btn" data-variant="outline" data-size="sm" onclick="App.bulkDisable()">Disable</button>
+        <button type="button" class="btn" data-variant="destructive" data-size="sm" onclick="App.bulkDelete()">Delete</button>
+        <span class="bulk-bar-spacer"></span>
+        <button type="button" class="btn" data-variant="ghost" data-size="sm" onclick="App.clearSelection()">Clear selection</button>
+      </div>
+      <div id="jobs-container"></div>
+      <div class="table-footer">
+        <span id="table-summary">Showing 0 jobs</span>
+        <div class="table-footer-controls">
+          <select id="page-size" class="input" aria-label="Rows per page">
+            
+            <option value="10">10 per page</option>
+            <option value="25">25 per page</option>
+            <option value="50">50 per page</option>
+          </select>
+          <div class="pagination" id="pagination"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-		<% if (!crontab.stopped) { %>
-			<% if (crontab.logging && crontab.logging != "false") {%>
-					<a class="btn btn-sm btn-danger" data-bs-toggle="tooltip" data-bs-placement="left" title="stderr" href="<%= JSON.parse(routes).logger + '?id=' + crontab._id %>" target="_blank"><i class="bi bi-journal-text"></i></a>
-					<a class="btn btn-sm btn-primary" data-bs-toggle="tooltip" data-bs-placement="left" title="stdout" href="<%= JSON.parse(routes).stdout + '?id=' + crontab._id %>" target="_blank"><i class="bi bi-journal-text"></i></a>
-			<% } %>
-					<a class="btn btn-sm btn-info" onclick="runJob('<%= crontab._id %>')"><i class="bi bi-play-fill"></i> Run now</a>
-					<a class="btn btn-sm btn-primary" onclick="editJob('<%= crontab._id %>')"><i class="bi bi-pencil-square"></i> Edit</a>
-					<a class="btn btn-sm btn-secondary" onclick="stopJob('<%= crontab._id %>')"><i class="bi bi-stop-fill"></i> Disable</a>
-		<% } else { %>
-					<a class="btn btn-sm btn-info" onclick="startJob('<%= crontab._id %>')"><i class="bi bi-play-fill"></i> Enable</a>
-		<% } %>
-					<a class="btn btn-sm btn-warning" onclick="duplicateJob('<%= crontab._id %>')"><i class="bi bi-copy"></i></a>
-					<a class="btn btn-sm btn-danger" onclick="deleteJob('<%= crontab._id %>')"><i class="bi bi-trash"></i></a>
-				</td>
-			</tr>
-	<% }); %>
+  <!-- Settings drawer -->
+  <dialog id="settings-drawer" class="drawer" data-side="right" aria-labelledby="settings-title" onclick="if (event.target === this) this.close()">
+    <article>
+      <header>
+        <div class="drawer-heading">
+          <h2 id="settings-title">Environment variables</h2>
+          <p>Set PATH, MAILTO, HOME, and other variables applied to all jobs.</p>
+        </div>
+        <button type="button" class="btn drawer-close" data-variant="ghost" data-size="icon-sm" aria-label="Close" onclick="this.closest('dialog').close()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </header>
+      <section>
+        <div role="group" class="field">
+          <label for="env-vars">Variables</label>
+          <textarea id="env-vars" rows="10" placeholder="# Please set PATH, MAILTO, HOME... here"></textarea>
+        </div>
+      </section>
+      <footer>
+        <button type="button" class="btn" data-variant="outline" onclick="this.closest('dialog').close()">Cancel</button>
+        <button type="button" class="btn" onclick="App.saveEnvVars()">Save</button>
+      </footer>
+    </article>
+  </dialog>
+
+  <!-- Logs drawer -->
+  <dialog id="logs-drawer" class="drawer" data-side="right" aria-labelledby="logs-title" onclick="if (event.target === this) this.close()">
+    <article>
+      <header>
+        <div class="drawer-heading">
+          <h2 id="logs-title">Job logs</h2>
+          <p id="logs-subtitle">Output for selected job</p>
+        </div>
+        <button type="button" class="btn drawer-close" data-variant="ghost" data-size="icon-sm" aria-label="Close" onclick="this.closest('dialog').close()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </header>
+      <section>
+        <div class="tabs w-full" id="logs-tabs">
+          <nav role="tablist" aria-orientation="horizontal">
+            <button type="button" role="tab" id="logs-tab-stdout" aria-controls="logs-panel-stdout" aria-selected="true" tabindex="0">stdout</button>
+            <button type="button" role="tab" id="logs-tab-stderr" aria-controls="logs-panel-stderr" aria-selected="false" tabindex="-1">stderr</button>
+          </nav>
+          <div role="tabpanel" id="logs-panel-stdout" aria-labelledby="logs-tab-stdout" tabindex="-1" aria-selected="true">
+            <pre id="stdout-content" class="log-output"></pre>
+          </div>
+          <div role="tabpanel" id="logs-panel-stderr" aria-labelledby="logs-tab-stderr" tabindex="-1" aria-selected="false" hidden>
+            <pre id="stderr-content" class="log-output"></pre>
+          </div>
+        </div>
+      </section>
+      <footer>
+        <button type="button" class="btn" data-variant="outline" onclick="this.closest('dialog').close()">Close</button>
+      </footer>
+    </article>
+  </dialog>
+
+  <!-- Job dialog -->
+  <dialog id="job-dialog" class="dialog" aria-labelledby="job-dialog-title" onclick="if (event.target === this) this.close()">
+    <div>
+      <header>
+        <h2 id="job-dialog-title">New job</h2>
+        <p id="job-dialog-desc">Configure command, schedule, and optional notifications.</p>
+      </header>
+      <section>
+        <div class="job-form">
+          <div role="group" class="field">
+            <label for="job-name">Name (optional)</label>
+            <input type="text" id="job-name" data-testid="job-name" placeholder="daily-backup" />
+          </div>
+          <div role="group" class="field">
+            <label for="schedule-preset">Schedule preset</label>
+            <select id="schedule-preset" class="input" aria-label="Schedule preset">
+              <option value="">Custom</option>
+            </select>
+          </div>
+          <div role="group" class="field">
+            <label for="job-cron">Cron expression</label>
+            <input type="text" id="job-cron" data-testid="job-cron" value="* * * * *" spellcheck="false" autocomplete="off" />
+          </div>
+          <div role="group" class="field">
+            <label for="job-command">Command</label>
+            <textarea id="job-command" data-testid="job-command" rows="4" placeholder="/usr/local/bin/backup.sh"></textarea>
+          </div>
+
+          <details class="job-advanced" id="job-advanced">
+            <summary>Advanced</summary>
+            <div class="job-advanced-body">
+              <label class="job-logging-row" for="job-logging">
+                <input type="checkbox" id="job-logging" checked />
+                Enable error logging
+              </label>
+              <p class="job-advanced-note">Based on nodemailer. Configure transporter and mail options as JSON.</p>
+              <div role="group" class="field">
+                <label for="mail-transporter">Transporter</label>
+                <input type="text" id="mail-transporter" placeholder="smtp://user:pass@smtp.example.com:587" />
+              </div>
+              <div role="group" class="field">
+                <label for="mail-options">Mail config (JSON)</label>
+                <textarea id="mail-options" rows="8" placeholder='{"from":"cron@example.com","to":"admin@example.com"}'></textarea>
+              </div>
+            </div>
+          </details>
+        </div>
+      </section>
+      <footer>
+        <button type="button" class="btn" data-variant="outline" onclick="document.getElementById('job-dialog').close()">Cancel</button>
+        <button type="button" class="btn" id="job-save-btn" data-testid="job-save-btn" onclick="App.saveJob()">Save</button>
+      </footer>
+      <button type="button" class="btn" data-variant="ghost" data-size="icon-sm" aria-label="Close" onclick="this.closest('dialog').close()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+  </dialog>
+
+  <!-- Preview dialog -->
+  <dialog id="preview-dialog" class="dialog" aria-labelledby="preview-title" onclick="if (event.target === this) this.close()">
+    <div>
+      <header>
+        <h2 id="preview-title">Crontab preview</h2>
+        <p>Preview of what will be deployed to the system crontab.</p>
+      </header>
+      <section>
+        <div class="alert" style="margin-bottom:1rem">
+          <h2>Unsaved changes</h2>
+          <section>This preview may differ from the active crontab if you have unsaved changes.</section>
+        </div>
+        <pre id="preview-content" class="preview-output"></pre>
+      </section>
+      <footer>
+        <button type="button" class="btn" data-variant="outline" onclick="App.copyPreview()">Copy</button>
+        <button type="button" class="btn" onclick="document.getElementById('preview-dialog').close()">Close</button>
+      </footer>
+      <button type="button" class="btn" data-variant="ghost" data-size="icon-sm" aria-label="Close" onclick="this.closest('dialog').close()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+  </dialog>
+
+  <!-- Confirm dialog -->
+  <dialog id="confirm-dialog" class="dialog" aria-labelledby="confirm-title" onclick="if (event.target === this) this.close()">
+    <div class="sm:max-w-sm">
+      <header>
+        <h2 id="confirm-title">Confirm</h2>
+        <p id="confirm-desc"></p>
+      </header>
+      <section id="confirm-body"></section>
+      <footer>
+        <button type="button" class="btn" data-variant="outline" id="confirm-cancel" onclick="document.getElementById('confirm-dialog').close()">Cancel</button>
+        <button type="button" class="btn" id="confirm-ok">Confirm</button>
+      </footer>
+      <button type="button" class="btn" data-variant="ghost" data-size="icon-sm" aria-label="Close" onclick="this.closest('dialog').close()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+  </dialog>
+
+  <!-- Backup list dialog -->
+  <dialog id="backup-dialog" class="dialog" aria-labelledby="backup-title" onclick="if (event.target === this) this.close()">
+    <div>
+      <header>
+        <h2 id="backup-title">Backups</h2>
+        <p>Restore or delete saved snapshots of your cron configuration.</p>
+      </header>
+      <section>
+        <div id="backup-list" class="backup-list"></div>
+      </section>
+      <footer>
+        <button type="button" class="btn" data-variant="outline" onclick="document.getElementById('backup-dialog').close()">Close</button>
+      </footer>
+      <button type="button" class="btn" data-variant="ghost" data-size="icon-sm" aria-label="Close" onclick="this.closest('dialog').close()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+  </dialog>
+
+  <!-- Restore preview dialog -->
+  <dialog id="restore-dialog" class="dialog" aria-labelledby="restore-title" onclick="if (event.target === this) this.close()">
+    <div>
+      <header>
+        <h2 id="restore-title">Restore backup</h2>
+        <p id="restore-desc">Review jobs in this backup before restoring.</p>
+      </header>
+      <section>
+        <table class="table">
+          <thead>
+            <tr><th>Name</th><th>Command</th><th>Schedule</th><th>Status</th></tr>
+          </thead>
+          <tbody id="restore-table-body"></tbody>
+        </table>
+      </section>
+      <footer>
+        <button type="button" class="btn" data-variant="outline" onclick="document.getElementById('restore-dialog').close()">Cancel</button>
+        <button type="button" class="btn" id="restore-confirm-btn">Restore</button>
+      </footer>
+      <button type="button" class="btn" data-variant="ghost" data-size="icon-sm" aria-label="Close" onclick="this.closest('dialog').close()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+  </dialog>
+
+  <div id="toaster" class="toaster" data-align="end"></div>
+
+  <!-- Shared row actions menu (fixed position, outside table overflow) -->
+  <div id="row-actions-panel" class="row-actions-panel" role="menu" hidden></div>
 
 
-</tbody>
-	</table>
-</div>
-<%- include('popup.ejs') -%>
-<script>
-   document.addEventListener('DOMContentLoaded', function() {
-   	$('#main_table').DataTable({
-   		order: [[1, 'asc']],
-   		columns: [
-   			{orderable: false},
-   			null,
-   			null,
-   			null,
-   			{orderable: false},
-   			{orderable: false}
-   		],
-        	stateSave: true,
-        	stateDuration: 0
-  	});
-   });
- </script>
+  <script src="https://cdn.jsdelivr.net/npm/basecoat-css@1.0.2/dist/js/all.min.js" defer></script>
+  <script src="mailconfig.js"></script>
+  <script>
+    window.__CRON_GUI__ = {
+      routes: <%- routes %>,
+      crontabs: <%- crontabs %>,
+      backups: <%- JSON.stringify(backups) %>,
+      env: <%- JSON.stringify(env) %>
+    };
+  </script>
+  <script src="js/app.js"></script>
 </body>
 </html>

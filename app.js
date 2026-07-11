@@ -143,6 +143,12 @@ app.get(routes.restore, validateDbParam, (req, res) => {
   });
 });
 
+app.get(routes.restore_data, validateDbParam, (req, res) => {
+  restore.crontabs(req.query.db, (docs) => {
+    res.json(docs);
+  });
+});
+
 app.get(routes.delete_backup, validateDbParam, (req, res) => {
   restore.delete(req.query.db);
   res.end();
