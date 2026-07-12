@@ -36,4 +36,8 @@ First preview release of **Cron GUI**.
 - Logging checkbox default (unchecked for new jobs)
 - Redundant Express static middleware mounts
 
+### Removed
+
+- Unused per-job `hook` post-run command support (never exposed in UI; upstream crontab-ui showed “Coming Soon” only)
+
 [0.1.0]: https://github.com/ysskrishna/cron-gui/releases/tag/v0.1.0

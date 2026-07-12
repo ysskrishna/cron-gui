@@ -64,10 +64,6 @@ function makeCommand(tab) {
     result += `; if test -f ${stdout}; then date >> "${logFileStdout}"; cat ${stdout} >> "${logFileStdout}"; fi`;
   }
 
-  if (tab.hook) {
-    result += `; if test -f ${stdout}; then ${tab.hook} < ${stdout}; fi`;
-  }
-
   if (tab.mailing && JSON.stringify(tab.mailing) !== '{}') {
     const nodeBin = process.env.NODE_BIN || process.execPath;
     const mailerScript = path.join(__dirname, 'bin', 'cron-gui-mailer.js');
