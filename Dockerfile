@@ -1,8 +1,9 @@
-# docker run -d -p 8000:8000 alseambusher/crontab-ui
+# docker run -d -p 8000:8000 ysskrishna/cron-gui
 FROM node:22-alpine AS build
 
 WORKDIR /crontab-ui
 COPY package.json package-lock.json ./
+ENV NODE_ENV=production
 RUN npm ci --omit=dev
 
 FROM node:22-alpine
@@ -18,8 +19,10 @@ RUN   apk --no-cache add \
 
 WORKDIR /crontab-ui
 
-LABEL maintainer="@alseambusher"
-LABEL description="Crontab-UI docker"
+LABEL org.opencontainers.image.title="cron-gui"
+LABEL org.opencontainers.image.description="Modern web UI for managing crontab jobs"
+LABEL org.opencontainers.image.source="https://github.com/ysskrishna/cron-gui"
+LABEL org.opencontainers.image.licenses="MIT"
 
 COPY --from=build /crontab-ui/node_modules ./node_modules
 COPY . .

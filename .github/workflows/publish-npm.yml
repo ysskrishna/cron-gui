@@ -1,0 +1,69 @@
+name: Publish npm
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag (must match package.json), e.g. v0.1.0
+        required: true
+        type: string
+      prerelease:
+        description: Publish as prerelease (dist-tag "next")
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: publish-npm-${{ github.event.release.tag_name || github.event.inputs.tag }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  RELEASE_TAG: ${{ github.event.release.tag_name || github.event.inputs.tag }}
+  IS_PRERELEASE: ${{ (github.event_name == 'release' && github.event.release.prerelease) || (github.event_name == 'workflow_dispatch' && github.event.inputs.prerelease) }}
+
+jobs:
+  publish:
+    name: Validate, test, and publish package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+
+      - name: Validate release tag
+        uses: ./.github/actions/validate-release
+        with:
+          tag: ${{ env.RELEASE_TAG }}
+          base-branch: main
+
+      - name: Node quality checks
+        uses: ./.github/actions/node-quality
+        with:
+          node-version: "22"
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Publish package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          IS_PRERELEASE: ${{ env.IS_PRERELEASE }}
+        run: |
+          set -euo pipefail
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            npm publish --provenance --access public --tag next
+          else
+            npm publish --provenance --access public
+          fi

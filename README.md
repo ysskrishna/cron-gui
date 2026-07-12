@@ -62,29 +62,42 @@ cron-gui --reset
 
 ## Docker
 
+Pull the published image:
+
+```bash
+docker pull ysskrishna/cron-gui:latest
+docker run -d -p 8000:8000 ysskrishna/cron-gui
+```
+
 Build and run locally:
 
 ```bash
 git clone https://github.com/ysskrishna/cron-gui.git
 cd cron-gui
-docker build -t cron-gui .
-docker run -d -p 8000:8000 cron-gui
+docker build -t ysskrishna/cron-gui .
+docker run -d -p 8000:8000 ysskrishna/cron-gui
 ```
 
 With auth:
 
 ```bash
-docker run -e BASIC_AUTH_USER=user -e BASIC_AUTH_PWD=SecretPassword -d -p 8000:8000 cron-gui
+docker run -e BASIC_AUTH_USER=user -e BASIC_AUTH_PWD=SecretPassword -d -p 8000:8000 ysskrishna/cron-gui
 ```
 
 Persist data:
 
 ```bash
 mkdir -p crontabs/logs
-docker run --mount type=bind,source="$(pwd)/crontabs",target=/crontab-ui/crontabs -d -p 8000:8000 cron-gui
+docker run --mount type=bind,source="$(pwd)/crontabs",target=/crontab-ui/crontabs -d -p 8000:8000 ysskrishna/cron-gui
 ```
 
-> **Note:** Automated Docker Hub publishing is not set up yet. See [REVIEW.md](REVIEW.md) open questions.
+Or use Compose:
+
+```bash
+docker compose up -d
+```
+
+
 
 ## Migrating from crontab-ui
 

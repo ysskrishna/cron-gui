@@ -1,10 +1,24 @@
-VER=0.4.3
-PLATFORMS=linux/amd64,linux/arm64
+IMAGE ?= ysskrishna/cron-gui
+VER ?= $(shell node -p "require('./package.json').version")
+PLATFORMS ?= linux/amd64,linux/arm64
 
-release:
-	sed -i '' "s/version\": \".*/version\": \"$(VER)\",/" package.json
-	npm publish
+.PHONY: docker-build docker-push docker-run
+
+docker-build:
+	docker build -t $(IMAGE):$(VER) -t $(IMAGE):latest .
+
+docker-push:
 	docker buildx build --platform $(PLATFORMS) \
-		-t alseambusher/crontab-ui:latest \
-		-t alseambusher/crontab-ui:$(VER) \
+		-t $(IMAGE):latest \
+		-t $(IMAGE):$(VER) \
 		--push .
+
+docker-run:
+	docker run --rm -p 8000:8000 \
+		-v cron-gui-data:/crontab-ui/crontabs \
+		$(IMAGE):$(VER)
+
+# Manual fallback when CI is unavailable. Prefer GitHub Releases for production publishes.
+release:
+	npm publish --provenance --access public
+	$(MAKE) docker-push

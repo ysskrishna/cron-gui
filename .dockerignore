@@ -1,5 +1,16 @@
 .git
+.github
 *.swp
 node_modules
 crontabs/*.db
 crontabs/logs/*.log
+test-results
+playwright-report
+tests
+vitest.config.js
+eslint.config.js
+.editorconfig
+.prettierrc
+.prettierignore
+Makefile
+docker-compose.yml

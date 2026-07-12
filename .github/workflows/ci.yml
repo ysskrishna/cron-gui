@@ -9,7 +9,6 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-
     strategy:
       matrix:
         node-version: [20, 22]
@@ -17,16 +16,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+      - name: Node quality checks
+        uses: ./.github/actions/node-quality
         with:
           node-version: ${{ matrix.node-version }}
-          cache: npm
 
-      - run: npm ci
+  docker-build:
+    name: Verify Docker image builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Lint
-        run: npm run lint
-
-      - name: Test
-        run: npm test
+      - name: Build image (no push)
+        uses: ./.github/actions/docker-build-local
+        with:
+          image-tag: cron-gui:ci
+          cache-scope: ci

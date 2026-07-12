@@ -1,17 +1,18 @@
 services:
-  crontab-ui:
+  cron-gui:
     build: .
-    image: alseambusher/crontab-ui
+    image: ysskrishna/cron-gui
     ports:
       - "8000:8000"
     volumes:
-      - crontab-data:/crontab-ui/crontabs
+      - cron-gui-data:/crontab-ui/crontabs
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 5s
+      start_period: 10s
+    restart: unless-stopped
 
 volumes:
-  crontab-data:
+  cron-gui-data:

@@ -4,3 +4,4 @@ crontabs/*.db
 crontabs/logs/*.log
 test-results/
 playwright-report/
+workspace/
