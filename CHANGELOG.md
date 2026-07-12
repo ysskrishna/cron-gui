@@ -16,7 +16,7 @@ First preview release of the redesigned **Cron GUI** (fork of [crontab-ui](https
 - In-app backup restore preview (replaces legacy `/restore` page)
 - Schedule presets, job create/edit dialogs, stdout/stderr log drawer
 - `cron-gui` npm package with `crontab-ui` CLI alias preserved
-- `CHANGELOG.md`, `REVIEW.md`, updated README and migration notes
+- `CHANGELOG.md`, docs cleanup, updated README and migration notes
 - Vitest API coverage (30 tests)
 
 ### Changed

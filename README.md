@@ -139,8 +139,6 @@ If you find this project helpful:
 
 MIT © [Y. Siva Sai Krishna](https://github.com/ysskrishna) — see [LICENSE](LICENSE) for details.
 
-Based on [crontab-ui](https://github.com/alseambusher/crontab-ui) by Suresh Alse (MIT).
-
 ---
 
 <p align="left">
