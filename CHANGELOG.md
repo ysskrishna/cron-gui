@@ -5,6 +5,37 @@ All notable changes to `cron-gui` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).  
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-07-12
+
+First stable release of **Cron GUI**.
+
+### Added
+
+- Server-side cron schedule validation (expressions and `@` macros) with clear error messages
+- Soft-delete workflow: pending-delete jobs, undelete action, and dashboard indicator
+- System crontab view (`/system_crontab`) and backup list/delete API endpoints
+- Smarter crontab import with line parsing, preview, and error handling
+- Preview endpoint accepts `env_vars` query param for unsaved environment changes
+- Structured Vitest suite: integration tests (backup, deploy, jobs, logs, pages, schedule, security) and unit tests (crontab, routes)
+- Test harness with `CRON_GUI_TEST=1` so the server exports without binding a port
+- `scripts/seed-demo-data.js` for local demo data
+- README screenshots and workflow GIF
+
+### Changed
+
+- Settings drawer UI and environment-variable descriptions
+- Major client-side refresh (`public/js/app.js`, `public/css/app.css`)
+- `app.js` refactored for testability; monolithic `tests/test.js` replaced by focused test files
+- **Publish npm** workflow: Node.js 22 → 24
+- README overhaul with badges, highlights table, and updated quick-start docs
+
+### Fixed
+
+- Crontab import failures now surface as HTTP errors instead of failing silently
+- Import/preview edge cases in `crontab.js` (wrapped commands, line parsing)
+
+[1.0.0]: https://github.com/ysskrishna/cron-gui/releases/tag/v1.0.0
+
 ## [0.1.4] - 2026-07-12
 
 Simplify release CI and switch npm publishing to trusted publishing.
