@@ -86,7 +86,6 @@ docker compose up -d
 - [Docker deployment guide](docs/docker.md)
 - [nginx integration](docs/nginx.md)
 - [Troubleshooting notes](docs/issues.md)
-- [Pre-release review / open issues](REVIEW.md)
 - [Upstream crontab-ui docs](https://github.com/alseambusher/crontab-ui)
 - [Release history (CHANGELOG)](CHANGELOG.md)
 
