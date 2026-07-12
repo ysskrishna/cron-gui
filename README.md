@@ -5,8 +5,11 @@
 Cron GUI
 ========
 
-[![npm](https://img.shields.io/npm/v/cron-gui.svg?style=flat-square)](https://www.npmjs.com/package/cron-gui)
-[![npm](https://img.shields.io/npm/l/cron-gui.svg?style=flat-square)](LICENSE)
+[![npm version](https://img.shields.io/npm/v/cron-gui.svg?style=flat-square)](https://www.npmjs.com/package/cron-gui)
+[![CI](https://github.com/ysskrishna/cron-gui/actions/workflows/ci.yml/badge.svg)](https://github.com/ysskrishna/cron-gui/actions/workflows/ci.yml)
+[![Docker Pulls](https://img.shields.io/docker/pulls/ysskrishna/cron-gui.svg?style=flat-square)](https://hub.docker.com/r/ysskrishna/cron-gui)
+[![Node](https://img.shields.io/node/v/cron-gui.svg?style=flat-square)](https://nodejs.org/)
+[![License: MIT](https://img.shields.io/github/license/ysskrishna/cron-gui.svg?style=flat-square)](LICENSE)
 
 Cron GUI is a web interface for managing cron jobs without editing `crontab` text by hand. Create, edit, pause, run, back up, and restore jobs from one place.
 
