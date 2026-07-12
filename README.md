@@ -8,8 +8,7 @@ Cron GUI
 [![npm](https://img.shields.io/npm/v/cron-gui.svg?style=flat-square)](https://www.npmjs.com/package/cron-gui)
 [![npm](https://img.shields.io/npm/l/cron-gui.svg?style=flat-square)](LICENSE)
 
-Cron GUI is a web interface for managing cron jobs without editing `crontab` text by hand.
-Create, edit, pause, run, back up, and restore jobs from one place.
+Cron GUI is a web interface for managing cron jobs without editing `crontab` text by hand. Create, edit, pause, run, back up, and restore jobs from one place.
 
 ![flow](https://github.com/alseambusher/crontab-ui/raw/gh-pages/screenshots/flow.gif)
 
