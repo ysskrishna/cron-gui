@@ -479,14 +479,66 @@
       font-size: 0.8125rem;
     }
 
-    .github-link {
-      color: var(--muted-foreground);
-      font-size: 0.875rem;
-      text-decoration: none;
+    .repo-button-group {
+      display: inline-flex;
+      align-items: stretch;
+      height: 2rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
     }
 
-    .github-link:hover {
+    .repo-button-group__repo,
+    .repo-button-group__star {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0 0.65rem;
+      background: var(--background);
       color: var(--foreground);
+      font-size: 0.8125rem;
+      font-weight: 500;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+
+    .repo-button-group__repo:hover,
+    .repo-button-group__star:hover {
+      background: var(--accent);
+    }
+
+    .repo-button-group__star {
+      border-left: 1px solid var(--border);
+      color: var(--muted-foreground);
+    }
+
+    .repo-button-group__star:hover {
+      color: var(--foreground);
+    }
+
+    .repo-button-group__icon {
+      flex-shrink: 0;
+    }
+
+    .repo-button-group__path {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+
+    .repo-button-group__path--short {
+      display: none;
+    }
+
+    @media (max-width: 640px) {
+      .repo-button-group__path--full {
+        display: none;
+      }
+
+      .repo-button-group__path--short {
+        display: inline;
+      }
     }
 
     /* Side drawers: Basecoat defaults footer to column layout and has no close-btn positioning */
