@@ -1,6 +1,6 @@
 {
   "name": "cron-gui",
-  "description": "Modern web UI for managing crontab jobs",
+  "description": "Web interface for managing cron jobs without editing crontab by hand",
   "repository": "https://github.com/ysskrishna/cron-gui",
   "logo": "https://raw.githubusercontent.com/ysskrishna/cron-gui/main/public/img/icon-512-dark.png",
   "keywords": ["cron", "crontab", "node"]

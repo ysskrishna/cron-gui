@@ -20,7 +20,7 @@ RUN   apk --no-cache add \
 WORKDIR /crontab-ui
 
 LABEL org.opencontainers.image.title="cron-gui"
-LABEL org.opencontainers.image.description="Modern web UI for managing crontab jobs"
+LABEL org.opencontainers.image.description="Web interface for managing cron jobs without editing crontab by hand"
 LABEL org.opencontainers.image.source="https://github.com/ysskrishna/cron-gui"
 LABEL org.opencontainers.image.licenses="MIT"
 

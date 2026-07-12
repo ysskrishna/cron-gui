@@ -1,7 +1,7 @@
 {
   "name": "cron-gui",
   "version": "0.1.0",
-  "description": "Modern web UI for managing your crontab file",
+  "description": "Web interface for managing cron jobs without editing crontab by hand",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",

@@ -98,7 +98,7 @@ jobs:
           tags: ${{ steps.tags.outputs.tags }}
           labels: |
             org.opencontainers.image.title=cron-gui
-            org.opencontainers.image.description=Modern web UI for managing crontab jobs
+            org.opencontainers.image.description=Web interface for managing cron jobs without editing crontab by hand
             org.opencontainers.image.source=https://github.com/ysskrishna/cron-gui
             org.opencontainers.image.version=${{ env.RELEASE_TAG }}
             org.opencontainers.image.revision=${{ github.sha }}

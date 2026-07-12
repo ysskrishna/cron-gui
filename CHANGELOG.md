@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2026-07-12
 
-First preview release of the redesigned **Cron GUI** (fork of [crontab-ui](https://github.com/alseambusher/crontab-ui)).
+First preview release of **Cron GUI**.
 
 ### Added
 
