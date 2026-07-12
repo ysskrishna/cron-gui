@@ -34,6 +34,7 @@ jobs:
   publish:
     name: Validate, test, and publish package
     runs-on: ubuntu-latest
+    environment: prod
     timeout-minutes: 15
     steps:
       - name: Checkout release tag
