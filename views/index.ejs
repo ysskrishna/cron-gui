@@ -23,7 +23,7 @@
         <span>Cron GUI</span>
       </div>
       <div class="topbar-actions">
-        <button type="button" class="btn" data-variant="ghost" data-size="icon-sm" aria-label="Settings" title="Environment variables (PATH, MAILTO, etc.) — stored in env.db, separate from jobs" onclick="document.getElementById('settings-drawer').showModal()">
+        <button type="button" class="btn" data-variant="ghost" data-size="icon-sm" aria-label="Crontab environment" title="PATH, MAILTO, and other variables for all jobs" onclick="document.getElementById('settings-drawer').showModal()">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
         </button>
         <button type="button" id="theme-toggle" class="btn" data-variant="ghost" data-size="icon-sm" aria-label="Toggle theme" title="Toggle light/dark theme">
@@ -106,17 +106,16 @@
     <article>
       <header>
         <div class="drawer-heading">
-          <h2 id="settings-title">Environment variables</h2>
-          <p>Set PATH, MAILTO, HOME, and other variables applied to all jobs.</p>
+          <h2 id="settings-title">Crontab environment</h2>
+          <p id="settings-desc">One <code>KEY=value</code> per line, applied to all deployed jobs.</p>
         </div>
         <button type="button" class="btn drawer-close" data-variant="ghost" data-size="icon-sm" aria-label="Close" onclick="this.closest('dialog').close()">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
         </button>
       </header>
       <section>
-        <div role="group" class="field">
-          <label for="env-vars">Variables</label>
-          <textarea id="env-vars" rows="10" placeholder="# Please set PATH, MAILTO, HOME... here"></textarea>
+        <div role="group" class="field env-field">
+          <textarea id="env-vars" spellcheck="false" autocomplete="off" aria-labelledby="settings-title" aria-describedby="settings-desc" placeholder="PATH=/usr/local/bin:/usr/bin:/bin&#10;MAILTO=admin@example.com&#10;SHELL=/bin/bash"></textarea>
         </div>
       </section>
       <footer>

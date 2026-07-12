@@ -879,6 +879,34 @@
       margin-top: -0.125rem;
     }
 
+    #settings-drawer > article > section {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    #settings-drawer .env-field {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+      gap: 0.5rem;
+    }
+
+    #settings-drawer .drawer-heading p code {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+    }
+
+    #env-vars {
+      flex: 1;
+      min-height: 12rem;
+      font-family: var(--font-mono);
+      font-size: 0.8125rem;
+      line-height: 1.6;
+      resize: none;
+    }
+
     .actions-cell {
       position: relative;
       text-align: end;
