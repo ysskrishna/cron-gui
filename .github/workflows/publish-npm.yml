@@ -12,11 +12,6 @@ on:
         description: Release tag (must match package.json), e.g. v0.1.0
         required: true
         type: string
-      prerelease:
-        description: Publish as prerelease (dist-tag "next")
-        required: false
-        type: boolean
-        default: false
 
 concurrency:
   group: publish-npm-${{ github.event.inputs.tag || github.event.release.tag_name || github.ref_name }}
@@ -28,7 +23,6 @@ permissions:
 
 env:
   RELEASE_TAG: ${{ github.event.inputs.tag || github.event.release.tag_name || github.ref_name }}
-  IS_PRERELEASE: ${{ (github.event_name == 'release' && github.event.release.prerelease) || (github.event_name == 'workflow_dispatch' && github.event.inputs.prerelease) || (github.event_name == 'push' && contains(github.ref_name, '-')) }}
 
 jobs:
   publish:
@@ -63,11 +57,4 @@ jobs:
       - name: Publish package
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          IS_PRERELEASE: ${{ env.IS_PRERELEASE }}
-        run: |
-          set -euo pipefail
-          if [ "$IS_PRERELEASE" = "true" ]; then
-            npm publish --provenance --access public --tag next
-          else
-            npm publish --provenance --access public
-          fi
+        run: npm publish --provenance --access public

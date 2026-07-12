@@ -112,6 +112,5 @@ MIT © [Y. Siva Sai Krishna](https://github.com/ysskrishna) — see [LICENSE](LI
   <a href="https://github.com/ysskrishna">Author's GitHub</a> •
   <a href="https://linkedin.com/in/ysskrishna">Author's LinkedIn</a> •
   <a href="https://ysskrishna.space">Author's site</a> •
-  <a href="https://clawhub.ai/user/ysskrishna">ClawHub</a> •
   <a href="https://github.com/ysskrishna/cron-gui/issues">Report Issues</a>
 </p>

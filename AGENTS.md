@@ -85,10 +85,6 @@ Only create the commit or run these commands when the user asks.
 
 For **npm only** or **Docker only** republish, point to **Actions → Publish npm** or **Publish Docker → Run workflow** with the tag. See [workspace/README.md](workspace/README.md).
 
-### 4. Prereleases
-
-For versions like `1.0.0-beta.1`, use the same changelog section header `## [1.0.0-beta.1]`. Tags with a `-` suffix are treated as prereleases in CI.
-
 ## General
 
 - Match existing code style and keep diffs focused.
