@@ -70,7 +70,7 @@ function makeCommand(tab) {
 
   if (tab.mailing && JSON.stringify(tab.mailing) !== '{}') {
     const nodeBin = process.env.NODE_BIN || process.execPath;
-    const mailerScript = path.join(__dirname, 'bin', 'crontab-ui-mailer.js');
+    const mailerScript = path.join(__dirname, 'bin', 'cron-gui-mailer.js');
     result += `; ${nodeBin} ${mailerScript} ${tab._id} ${stdout} ${stderr}`;
   }
 

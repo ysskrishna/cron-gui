@@ -15,7 +15,7 @@ docker-push:
 
 docker-run:
 	docker run --rm -p 8000:8000 \
-		-v cron-gui-data:/crontab-ui/crontabs \
+		-v cron-gui-data:/cron-gui/crontabs \
 		$(IMAGE):$(VER)
 
 # Manual fallback when CI is unavailable. Prefer GitHub Releases for production publishes.

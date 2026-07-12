@@ -15,7 +15,7 @@ First preview release of **Cron GUI**.
 - Settings drawer for environment variables
 - In-app backup restore preview (replaces legacy `/restore` page)
 - Schedule presets, job create/edit dialogs, stdout/stderr log drawer
-- `cron-gui` npm package with `crontab-ui` CLI alias preserved
+- `cron-gui` npm package and CLI
 - `CHANGELOG.md`, docs cleanup, updated README and migration notes
 - Vitest API coverage (30 tests)
 

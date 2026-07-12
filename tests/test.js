@@ -6,7 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
-const testDbPath = path.join(os.tmpdir(), `crontab-ui-test-${Date.now()}`);
+const testDbPath = path.join(os.tmpdir(), `cron-gui-test-${Date.now()}`);
 fs.mkdirSync(testDbPath, { recursive: true });
 fs.mkdirSync(path.join(testDbPath, 'logs'), { recursive: true });
 

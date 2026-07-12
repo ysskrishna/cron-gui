@@ -48,9 +48,8 @@
     "node": ">=20.0.0"
   },
   "bin": {
-    "cron-gui": "bin/crontab-ui.js",
-    "crontab-ui": "bin/crontab-ui.js",
-    "crontab-ui-mailer": "bin/crontab-ui-mailer.js"
+    "cron-gui": "bin/cron-gui.js",
+    "cron-gui-mailer": "bin/cron-gui-mailer.js"
   },
   "repository": {
     "type": "git",

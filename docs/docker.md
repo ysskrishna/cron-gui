@@ -20,7 +20,7 @@ mkdir -p crontabs
 docker run -d \
   --name cron-gui \
   -p 8000:8000 \
-  --mount type=bind,source="$(pwd)/crontabs",target=/crontab-ui/crontabs \
+  --mount type=bind,source="$(pwd)/crontabs",target=/cron-gui/crontabs \
   ysskrishna/cron-gui:latest
 ```
 

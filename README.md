@@ -69,7 +69,6 @@ docker compose up -d
 ## Migrating from crontab-ui
 
 - Install `cron-gui` instead of `crontab-ui`; existing `crontab.db` files are compatible.
-- The `crontab-ui` CLI alias still works.
 - **Hooks:** The old UI had a hooks editor (never fully implemented). The backend still runs `hook` commands on jobs that already have them, but the new UI has no hook editor. Editing a job in the UI preserves an existing `hook` field; hooks cannot be added or changed from the UI.
 - **Schedule presets:** The new UI uses 5-field cron expressions plus `@reboot`. Macros like `@hourly` still work in crontab if typed manually.
 

@@ -5,7 +5,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - cron-gui-data:/crontab-ui/crontabs
+      - cron-gui-data:/cron-gui/crontabs
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
       interval: 30s

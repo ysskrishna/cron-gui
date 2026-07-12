@@ -13,12 +13,6 @@ This page covers runtime configuration, CLI flags, and operational notes.
 cron-gui
 ```
 
-Backward-compatible alias:
-
-```bash
-crontab-ui
-```
-
 ## Environment variables
 
 | Variable | Default | Purpose |
