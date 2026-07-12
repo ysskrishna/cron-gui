@@ -5,6 +5,16 @@ All notable changes to `cron-gui` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).  
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-07-12
+
+Fix manual republish workflows ignoring the entered release tag.
+
+### Fixed
+
+- **Publish Docker** and **Publish npm** workflows: prefer `workflow_dispatch` tag input over `github.ref_name` so manual runs from `main` use the requested tag (e.g. `v0.1.2`) instead of the branch name
+
+[0.1.3]: https://github.com/ysskrishna/cron-gui/releases/tag/v0.1.3
+
 ## [0.1.2] - 2026-07-12
 
 Fix publish workflows to read secrets from the `prod` environment.
