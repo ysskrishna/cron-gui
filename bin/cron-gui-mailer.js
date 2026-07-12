@@ -9,6 +9,12 @@ const stdoutPath = process.argv[process.argv.length - 2];
 const stderrPath = process.argv[process.argv.length - 1];
 
 crontab.get_crontab(jobId, (job) => {
+  if (!job?.mailing?.transporterStr || !job.mailing.mailOptions) {
+    console.error(`Mailer: missing job or mailing config for id ${jobId}`);
+    process.exit(1);
+    return;
+  }
+
   const transporter = nodemailer.createTransport(job.mailing.transporterStr);
   const mailOptions = job.mailing.mailOptions;
 

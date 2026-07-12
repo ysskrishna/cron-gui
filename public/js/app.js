@@ -49,7 +49,7 @@ function defaultUiState() {
     statusFilter: 'all',
     selectedIds: [],
     backupSelectedIds: [],
-    commandColWidth: 28,
+    commandColWidth: 22,
   };
 }
 
@@ -75,6 +75,25 @@ function parseBackupDate(name) {
   return new Date(t.substring(0, t.length - 3)).valueOf();
 }
 
+function formatNextRun(next) {
+  if (!next || next === 'invalid') return null;
+  if (next === 'Next Reboot') return 'Next reboot';
+  try {
+    const date = new Date(next);
+    if (Number.isNaN(date.getTime())) return null;
+    const diffMs = date.getTime() - Date.now();
+    if (diffMs < 0) return 'Overdue';
+    const mins = Math.round(diffMs / 60000);
+    if (mins < 1) return 'in <1 min';
+    if (mins < 60) return `in ${mins} min`;
+    const hours = Math.round(mins / 60);
+    if (hours < 48) return `in ${hours} hr`;
+    return date.toLocaleString();
+  } catch {
+    return null;
+  }
+}
+
 function mapCrontabToJob(tab, pendingRemoval = false) {
   const modifiedAt = tab.created || (tab.timestamp ? new Date(tab.timestamp).getTime() : Date.now());
   return {
@@ -84,6 +103,7 @@ function mapCrontabToJob(tab, pendingRemoval = false) {
     schedule: tab.schedule,
     fields: splitSchedule(tab.schedule),
     human: tab.human || describeSchedule(tab.schedule),
+    nextRun: formatNextRun(tab.next),
     enabled: !tab.stopped,
     saved: !!tab.saved,
     everDeployed: !!tab.everDeployed,
@@ -154,7 +174,24 @@ async function apiGet(key, params) {
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   }
   const res = await fetch(url.toString());
-  if (!res.ok) throw new Error(res.statusText || 'Request failed');
+  if (!res.ok) {
+    const contentType = res.headers.get('content-type') || '';
+    let message = res.statusText || 'Request failed';
+    if (contentType.includes('application/json')) {
+      try {
+        const data = await res.json();
+        message = data.message || message;
+      } catch {
+        // ignore parse errors
+      }
+    } else {
+      const text = await res.text();
+      if (text) message = text;
+    }
+    const error = new Error(message);
+    error.status = res.status;
+    throw error;
+  }
   return res;
 }
 
@@ -553,7 +590,18 @@ function pendingRemovalActions(job) {
   return `<button type="button" class="btn" data-variant="outline" data-size="sm" data-testid="undo-delete-btn" onclick="App.undoDeleteJob('${id}')">Undo</button>`;
 }
 
-function renderJobTableRow(job, rowNum) {
+function isMobileView() {
+  return window.matchMedia('(max-width: 640px)').matches;
+}
+
+let lastMobileView = isMobileView();
+
+function renderNextRun(job) {
+  if (!job.nextRun) return '';
+  return `<div class="next-run" title="Next run">Next: ${escapeHtml(job.nextRun)}</div>`;
+}
+
+function renderJobTableRow(job) {
   const scheduleTip = escapeHtml(job.human || describeSchedule(job.schedule));
   const modifiedTip = escapeHtml(formatModified(job.modifiedAt));
   const safeId = escapeHtml(job.id).replace(/'/g, "\\'");
@@ -567,15 +615,17 @@ function renderJobTableRow(job, rowNum) {
                     ${isSelected(job.id) ? 'checked' : ''}
                     onchange="App.toggleSelect('${safeId}', this.checked)" />`}
                 </td>
-                <td>${rowNum}</td>
-                <td>
+                <td class="col-name">
                   <div class="job-name">
                     <span class="status-dot ${statusDot(job)}" title="${escapeHtml(statusDotTitle(job))}"></span>
                     <span class="job-name-text">${escapeHtml(job.name || job.id)}</span>
                   </div>
                 </td>
                 <td class="col-command" style="width:${colW}"><div class="job-command" title="${escapeHtml(job.command)}">${escapeHtml(job.command)}</div></td>
-                <td><code class="schedule-cell" title="${scheduleTip}">${escapeHtml(job.schedule)}</code></td>
+                <td>
+                  <code class="schedule-cell" title="${scheduleTip}">${escapeHtml(job.schedule)}</code>
+                  ${renderNextRun(job)}
+                </td>
                 <td>${statusBadge(job)}</td>
                 <td title="${modifiedTip}">${timeAgo(job.modifiedAt)}</td>
                 <td class="actions-cell">
@@ -609,6 +659,7 @@ function renderJobCard(job) {
             ${statusBadge(job)}
           </div>
           <code class="schedule-cell job-card__schedule" title="${scheduleTip}">${escapeHtml(job.schedule)}</code>
+          ${renderNextRun(job)}
           <div class="job-command job-card__command" title="${escapeHtml(job.command)}">${escapeHtml(job.command)}</div>
           <div class="job-card__meta" title="${modifiedTip}">${timeAgo(job.modifiedAt)}</div>
         </div>
@@ -935,8 +986,11 @@ function renderJobs() {
     const allPageSelected = pageIds.length > 0 && pageIds.every((id) => isSelected(id));
     const somePageSelected = pageIds.some((id) => isSelected(id)) && !allPageSelected;
 
-    container.innerHTML = `
-      <div class="jobs-table-view">
+    container.innerHTML = isMobileView()
+      ? `<div class="jobs-card-view" data-testid="jobs-cards">
+          ${jobs.map((job) => renderJobCard(job)).join('')}
+        </div>`
+      : `<div class="jobs-table-view">
         <div class="table-scroll">
           <table class="table" data-testid="jobs-table">
             <thead>
@@ -946,9 +1000,8 @@ function renderJobs() {
                     ${allPageSelected ? 'checked' : ''}
                     onclick="App.toggleSelectAll(this.checked)" />
                 </th>
-                <th style="width:2.5rem">#</th>
-                <th>${sortHeaderLabel('Name', 'name')}</th>
-                <th class="col-command col-resize-handle" id="command-col-handle" style="width:${colW}">${sortHeaderLabel('Command', 'command')}</th>
+                <th class="col-name">${sortHeaderLabel('Name', 'name')}</th>
+                <th class="col-command col-resize-handle" id="command-col-handle" style="width:${colW}" title="Drag to resize command column">${sortHeaderLabel('Command', 'command')}</th>
                 <th>${sortHeaderLabel('Schedule', 'schedule')}</th>
                 <th>${sortHeaderLabel('Status', 'status')}</th>
                 <th>${sortHeaderLabel('Modified', 'modified')}</th>
@@ -956,20 +1009,18 @@ function renderJobs() {
               </tr>
             </thead>
             <tbody>
-              ${jobs.map((job, i) => renderJobTableRow(job, (state.ui.page - 1) * state.ui.pageSize + i + 1)).join('')}
+              ${jobs.map((job) => renderJobTableRow(job)).join('')}
             </tbody>
           </table>
         </div>
-      </div>
-      <div class="jobs-card-view" data-testid="jobs-cards">
-        ${jobs.map((job) => renderJobCard(job)).join('')}
       </div>`;
 
-    const selectAll = container.querySelector('thead input[type="checkbox"]');
-    if (selectAll) selectAll.indeterminate = somePageSelected;
-
-    attachCommandColumnResize();
-    applyCommandColumnWidth();
+    if (!isMobileView()) {
+      const selectAll = container.querySelector('thead input[type="checkbox"]');
+      if (selectAll) selectAll.indeterminate = somePageSelected;
+      attachCommandColumnResize();
+      applyCommandColumnWidth();
+    }
   }
 
   const selectedCount = state.ui.selectedIds.length;
@@ -1077,6 +1128,14 @@ const App = {
 
     document.getElementById('env-vars').addEventListener('input', updateUnsavedIndicator);
 
+    lastMobileView = isMobileView();
+    window.matchMedia('(max-width: 640px)').addEventListener('change', (e) => {
+      if (e.matches !== lastMobileView) {
+        lastMobileView = e.matches;
+        renderJobs();
+      }
+    });
+
     document.getElementById('confirm-ok').addEventListener('click', () => {
       document.getElementById('confirm-dialog').close();
       if (confirmCallback) confirmCallback();
@@ -1108,10 +1167,14 @@ const App = {
 
   saveEnvVars() {
     state.envVars = document.getElementById('env-vars').value;
-    document.getElementById('settings-drawer').close();
-    updateUnsavedIndicator();
-    reinitComponents();
-    toast('success', 'Environment updated', 'Variables will be saved when you deploy to crontab.');
+    const drawer = document.getElementById('settings-drawer');
+    const onClose = () => {
+      drawer.removeEventListener('close', onClose);
+      updateUnsavedIndicator();
+      toast('success', 'Environment updated', 'Variables will be saved when you deploy to crontab.');
+    };
+    drawer.addEventListener('close', onClose);
+    drawer.close();
   },
 
   clearFilters() {
@@ -1287,6 +1350,11 @@ const App = {
     try {
       await apiPost('save', payload);
       document.getElementById('job-dialog').close();
+      if (!editingJobId) {
+        state.ui.statusFilter = 'all';
+        state.ui.search = '';
+        saveUiState();
+      }
       reloadPage();
     } catch (err) {
       if (err.status === 400) {
@@ -1516,7 +1584,8 @@ const App = {
 
   async openPreview() {
     try {
-      const res = await apiGet('preview_crontab');
+      const envVars = document.getElementById('env-vars').value;
+      const res = await apiGet('preview_crontab', { env_vars: envVars });
       const text = await res.text();
       document.getElementById('preview-content').textContent = text || '# (empty crontab)';
       document.getElementById('preview-unsaved-alert').classList.toggle('hidden', !hasUnsavedWork());

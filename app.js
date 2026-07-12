@@ -191,13 +191,15 @@ app.post(routes.import, (req, res, next) => {
 app.get(routes.import_crontab, (req, res, next) => {
   crontab.backup((err) => {
     if (err) return next(err);
-    crontab.import_crontab();
-    res.end();
+    crontab.import_crontab((importErr) => {
+      if (importErr) return next(importErr);
+      res.end();
+    });
   });
 });
 
 app.get(routes.preview_crontab, (req, res) => {
-  const envVars = crontab.get_env();
+  const envVars = req.query.env_vars !== undefined ? req.query.env_vars : crontab.get_env();
   crontab.preview_crontab(envVars, (result) => {
     res.type('text/plain').send(result);
   });

@@ -2,7 +2,7 @@
 
 const Datastore = require('@seald-io/nedb');
 const path = require('path');
-const { exec } = require('child_process');
+const childProcess = require('child_process');
 const fs = require('fs');
 const { CronExpressionParser } = require('cron-parser');
 const cronstrue = require('cronstrue/i18n');
@@ -299,7 +299,7 @@ exports.runjob = (_id) => {
     console.log(`Original command: ${res.command}`);
     console.log(`Executed command: ${cmd}`);
 
-    exec(cmd, (error) => {
+    childProcess.exec(cmd, (error) => {
       if (error) console.log(error);
     });
   });
@@ -328,7 +328,7 @@ exports.set_crontab = (envVars, callback) => {
           console.error(err);
           return callback(err);
         }
-        exec(`crontab ${path.join(cronPath, fileName)}`, (err) => {
+        childProcess.exec(`crontab ${path.join(cronPath, fileName)}`, (err) => {
           if (err) {
             console.error(err);
             return callback(err);
@@ -367,10 +367,22 @@ exports.backup = (callback) => {
   });
 };
 
-exports.restore = (dbName) => {
-  fs.createReadStream(path.join(dbFolder, dbName))
-    .pipe(fs.createWriteStream(crontabDbFile));
-  db.loadDatabase();
+exports.restore = (dbName, callback = () => {}) => {
+  const readStream = fs.createReadStream(path.join(dbFolder, dbName));
+  const writeStream = fs.createWriteStream(crontabDbFile);
+
+  const fail = (err) => {
+    readStream.destroy();
+    writeStream.destroy();
+    callback(err);
+  };
+
+  readStream.on('error', fail);
+  writeStream.on('error', fail);
+  readStream.pipe(writeStream);
+  writeStream.on('finish', () => {
+    db.loadDatabase((err) => callback(err));
+  });
 };
 
 exports.reload_db = () => {
@@ -384,15 +396,25 @@ exports.get_env = () => {
   return '';
 };
 
-exports.import_crontab = () => {
-  exec('crontab -l', (error, stdout) => {
-    if (error && !stdout) return;
+exports.import_crontab = (callback = () => {}) => {
+  childProcess.exec('crontab -l', (error, stdout) => {
+    if (error && !stdout) {
+      const err = new Error(
+        error.code === 1
+          ? 'No crontab for this user'
+          : (error.message || 'Failed to read system crontab'),
+      );
+      err.statusCode = error.code === 1 ? 404 : 500;
+      callback(err);
+      return;
+    }
     const lines = (stdout || '').split('\n');
     const namePrefix = Date.now();
 
     lines.forEach((line, index) => {
       processImportLine(line, namePrefix, index);
     });
+    callback(null);
   });
 };
 
@@ -412,7 +434,7 @@ exports.preview_crontab = (envVars, callback) => {
 };
 
 exports.system_crontab = (callback) => {
-  exec('crontab -l', (error, stdout) => {
+  childProcess.exec('crontab -l', (error, stdout) => {
     if (error && !stdout) {
       callback(error, '');
       return;

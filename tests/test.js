@@ -1,6 +1,6 @@
 'use strict';
 
-/* global describe, it, expect, beforeAll, afterAll */
+/* global describe, it, expect, beforeAll, afterAll, vi */
 const request = require('supertest');
 const path = require('path');
 const fs = require('fs');
@@ -203,6 +203,12 @@ describe('Cron GUI', () => {
 
       await request(app).post('/start').send({ _id: match[1] });
     });
+
+    it('should use env_vars query param when provided', async () => {
+      const res = await request(app).get('/preview_crontab?env_vars=MAILTO=preview%40test.com');
+      expect(res.status).toBe(200);
+      expect(res.text).toMatch(/^MAILTO=preview@test.com/);
+    });
   });
 
   describe('Input validation', () => {
@@ -321,6 +327,18 @@ describe('Cron GUI', () => {
       const backupsAfter = fs.readdirSync(testDbPath)
         .filter((f) => f.startsWith('backup'));
       expect(backupsAfter.length).toBe(backupsBefore.length + 1);
+    });
+
+    it('should surface crontab -l failures to the client', async () => {
+      const childProcess = require('child_process');
+      const spy = vi.spyOn(childProcess, 'exec').mockImplementation((cmd, cb) => {
+        cb(Object.assign(new Error('no crontab for user'), { code: 1 }), '');
+      });
+
+      const res = await request(app).get('/import_crontab');
+      expect(res.status).toBe(404);
+      expect(res.body.message).toContain('No crontab for this user');
+      spy.mockRestore();
     });
   });
 
