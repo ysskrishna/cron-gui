@@ -46,6 +46,21 @@ describe('Cron GUI', () => {
       expect(res.status).toBe(200);
     });
 
+    it('should reject an invalid cron schedule', async () => {
+      const res = await request(app)
+        .post('/save')
+        .send({
+          _id: -1,
+          name: 'bad-schedule-job',
+          command: 'echo hello',
+          schedule: '* * * * * sa',
+          logging: 'false',
+          mailing: {},
+        });
+      expect(res.status).toBe(400);
+      expect(res.text).toContain('Too many fields');
+    });
+
     it('should show the new job on the main page', async () => {
       const res = await request(app).get('/');
       expect(res.status).toBe(200);
@@ -336,6 +351,56 @@ describe('Cron GUI', () => {
       const res = await request(app).get('/');
       expect(res.text).toContain('<textarea');
       expect(res.text).toContain('data-testid="job-command"');
+    });
+
+    it('should render deploy cluster in toolbar', async () => {
+      const res = await request(app).get('/');
+      expect(res.text).toContain('data-testid="deploy-cluster"');
+      expect(res.text).toContain('data-testid="unsaved-indicator"');
+    });
+  });
+
+  describe('Job error status', () => {
+    it('should flag jobs with stderr logs as hasError when logging is enabled', async () => {
+      await request(app).post('/save').send({
+        _id: -1,
+        name: 'error-job',
+        command: 'echo fail',
+        schedule: '* * * * *',
+        logging: 'true',
+        mailing: {},
+      });
+      const page = await request(app).get('/');
+      const match = page.text.match(/data-job-id="([^"]+)"/);
+      const jobId = match ? match[1] : null;
+      if (!jobId) return;
+
+      const logFile = path.join(testDbPath, 'logs', `${jobId}.log`);
+      fs.writeFileSync(logFile, 'command failed\n');
+
+      const res = await request(app).get('/');
+      expect(res.text).toContain('"hasError":true');
+    });
+
+    it('should not flag jobs when stderr log only has run timestamps', async () => {
+      await request(app).post('/save').send({
+        _id: -1,
+        name: 'clean-job',
+        command: 'echo ok',
+        schedule: '* * * * *',
+        logging: 'true',
+        mailing: {},
+      });
+      const page = await request(app).get('/');
+      const match = page.text.match(/data-job-id="([^"]+)"/);
+      const jobId = match ? match[1] : null;
+      if (!jobId) return;
+
+      const logFile = path.join(testDbPath, 'logs', `${jobId}.log`);
+      fs.writeFileSync(logFile, 'Sun Jul 12 14:30:00 IST 2026\nSun Jul 12 14:31:00 IST 2026\n');
+
+      const res = await request(app).get('/');
+      expect(res.text).not.toContain('"hasError":true');
     });
   });
 });

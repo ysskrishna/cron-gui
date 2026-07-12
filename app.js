@@ -88,6 +88,9 @@ app.get(routes.root, (req, res) => {
 });
 
 app.post(routes.save, (req, res) => {
+  const scheduleError = crontab.validateSchedule(req.body.schedule);
+  if (scheduleError) return res.status(400).send(scheduleError);
+
   if (req.body._id == -1) { // eslint-disable-line eqeqeq
     crontab.create_new(req.body.name, req.body.command, req.body.schedule, req.body.logging, req.body.mailing);
   } else {

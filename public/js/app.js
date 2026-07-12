@@ -85,7 +85,7 @@ function mapCrontabToJob(tab) {
     logging: tab.logging === 'true' || tab.logging === true,
     mailing: tab.mailing || {},
     modifiedAt,
-    hasError: false,
+    hasError: !!tab.hasError,
   };
 }
 
@@ -124,7 +124,20 @@ async function apiPost(key, body) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(res.statusText || 'Request failed');
+  if (!res.ok) {
+    const contentType = res.headers.get('content-type') || '';
+    let message = res.statusText || 'Request failed';
+    if (contentType.includes('application/json')) {
+      const data = await res.json();
+      message = data.message || message;
+    } else {
+      const text = await res.text();
+      if (text) message = text;
+    }
+    const error = new Error(message);
+    error.status = res.status;
+    throw error;
+  }
 }
 
 async function apiGet(key, params) {
@@ -166,11 +179,84 @@ function splitSchedule(schedule) {
   return parts.slice(0, 5);
 }
 
+const CRON_MACROS = [
+  '@reboot', '@yearly', '@annually', '@monthly', '@weekly', '@daily', '@hourly', '@midnight',
+];
+
+function validateCronSchedule(schedule) {
+  const trimmed = String(schedule || '').trim();
+  if (!trimmed) return 'Cron expression is required.';
+
+  if (trimmed.startsWith('@')) {
+    if (CRON_MACROS.includes(trimmed.toLowerCase())) return null;
+    return `Unknown schedule macro "${trimmed}".`;
+  }
+
+  const parts = trimmed.split(/\s+/);
+  if (parts.length !== 5) {
+    if (parts.length > 5) {
+      return 'Too many fields. Cron uses 5 fields only — put your command in the Command field.';
+    }
+    return 'Cron needs 5 fields: minute hour day month weekday.';
+  }
+
+  return null;
+}
+
 function describeSchedule(schedule) {
   const preset = QUICK_SCHEDULES.find((q) => q.value === schedule);
   if (preset) return preset.label;
   if (schedule.startsWith('@')) return schedule.slice(1).replace(/^\w/, (c) => c.toUpperCase());
   return `Custom · ${schedule}`;
+}
+
+const JOB_FORM_ERROR_FIELDS = ['job-name', 'job-command', 'job-cron', 'mail-options'];
+
+function showFieldError(fieldId, message) {
+  clearJobFormErrors();
+  const input = document.getElementById(fieldId);
+  const errorEl = document.getElementById(`${fieldId}-error`);
+  if (!input || !errorEl) return;
+  errorEl.textContent = message;
+  errorEl.classList.remove('hidden');
+  input.setAttribute('aria-invalid', 'true');
+  input.classList.add('input-invalid');
+  input.focus();
+  if (fieldId === 'mail-options') {
+    document.getElementById('job-advanced').open = true;
+  }
+}
+
+function clearFieldError(fieldId) {
+  const input = document.getElementById(fieldId);
+  const errorEl = document.getElementById(`${fieldId}-error`);
+  if (errorEl) {
+    errorEl.textContent = '';
+    errorEl.classList.add('hidden');
+  }
+  if (input) {
+    input.removeAttribute('aria-invalid');
+    input.classList.remove('input-invalid');
+  }
+}
+
+function clearFormSaveError() {
+  const el = document.getElementById('job-form-save-error');
+  if (!el) return;
+  el.textContent = '';
+  el.classList.add('hidden');
+}
+
+function showFormSaveError(message) {
+  const el = document.getElementById('job-form-save-error');
+  if (!el) return;
+  el.textContent = message;
+  el.classList.remove('hidden');
+}
+
+function clearJobFormErrors() {
+  JOB_FORM_ERROR_FIELDS.forEach(clearFieldError);
+  clearFormSaveError();
 }
 
 function applyTheme(theme) {
@@ -370,7 +456,7 @@ function rowPrimaryActions(job) {
 
 function statusBadge(job) {
   if (!job.enabled) return '<span class="badge" data-variant="secondary">Disabled</span>';
-  if (job.hasError) return '<span class="badge" data-variant="destructive">Error</span>';
+  if (job.hasError) return '<span class="badge" data-variant="destructive">Failed run</span>';
   if (!job.saved) return '<span class="badge" data-variant="outline">Unsaved</span>';
   return '<span class="badge">Active</span>';
 }
@@ -403,9 +489,7 @@ function renderSchedulePresets() {
     QUICK_SCHEDULES.map((q) => `<option value="${escapeHtml(q.value)}">${escapeHtml(q.label)}</option>`).join('');
   select.addEventListener('change', () => {
     const value = select.value;
-    if (!value) return;
-    setScheduleValue(value);
-    syncSchedulePreset();
+    if (value) setScheduleValue(value);
   });
 }
 
@@ -417,7 +501,7 @@ function renderStatusFilter() {
     <option value="all">All (${counts.all})</option>
     <option value="active">Active (${counts.active})</option>
     <option value="unsaved">Unsaved (${counts.unsaved})</option>
-    <option value="error">Error (${counts.error})</option>
+    <option value="error">Failed run (${counts.error})</option>
     <option value="disabled">Disabled (${counts.disabled})</option>`;
   select.value = current;
 }
@@ -437,6 +521,36 @@ function updateBulkBar() {
   } else {
     bar.classList.add('hidden');
   }
+}
+
+function updateUnsavedIndicator() {
+  const cluster = document.getElementById('deploy-cluster');
+  const statusEl = document.getElementById('unsaved-indicator');
+  const statusText = document.getElementById('unsaved-indicator-text');
+  const saveBtn = document.querySelector('[data-testid="save-crontab-btn"]');
+  if (!cluster || !statusEl || !statusText || !saveBtn) return;
+
+  const { unsaved: unsavedJobs } = statusCounts();
+  const envEl = document.getElementById('env-vars');
+  const envDirty = envEl ? envEl.value !== state.envVars : false;
+  const pendingCount = unsavedJobs + (envDirty ? 1 : 0);
+  const hasUnsaved = pendingCount > 0;
+
+  cluster.classList.toggle('is-dirty', hasUnsaved);
+  cluster.classList.toggle('is-clean', !hasUnsaved);
+  statusEl.hidden = !hasUnsaved;
+
+  if (!hasUnsaved) {
+    statusText.textContent = '';
+    saveBtn.dataset.variant = 'outline';
+    saveBtn.title = 'Deploy env vars and enabled jobs to the system crontab';
+    return;
+  }
+
+  statusText.textContent = `${pendingCount} pending`;
+  saveBtn.dataset.variant = 'default';
+  saveBtn.title = 'Deploy pending changes to the system crontab';
+  reinitComponents();
 }
 
 function pruneSelection() {
@@ -675,7 +789,6 @@ function renderJobs() {
 
     attachCommandColumnResize();
     applyCommandColumnWidth();
-    reinitComponents();
   }
 
   const selectedCount = state.ui.selectedIds.length;
@@ -687,6 +800,8 @@ function renderJobs() {
 
   const pagination = document.getElementById('pagination');
   renderPaginationControls(pagination, totalPages);
+  updateUnsavedIndicator();
+  reinitComponents();
 }
 
 const App = {
@@ -765,7 +880,21 @@ const App = {
       renderJobs();
     });
 
-    document.getElementById('job-cron').addEventListener('input', syncSchedulePreset);
+    document.getElementById('job-cron').addEventListener('input', () => {
+      syncSchedulePreset();
+      clearFieldError('job-cron');
+      clearFormSaveError();
+    });
+    JOB_FORM_ERROR_FIELDS.forEach((id) => {
+      document.getElementById(id).addEventListener('input', () => {
+        clearFieldError(id);
+        clearFormSaveError();
+      });
+    });
+    document.getElementById('mail-transporter').addEventListener('input', clearFormSaveError);
+    document.getElementById('schedule-preset').addEventListener('change', clearFormSaveError);
+
+    document.getElementById('env-vars').addEventListener('input', updateUnsavedIndicator);
 
     document.getElementById('confirm-ok').addEventListener('click', () => {
       document.getElementById('confirm-dialog').close();
@@ -799,6 +928,8 @@ const App = {
   saveEnvVars() {
     state.envVars = document.getElementById('env-vars').value;
     document.getElementById('settings-drawer').close();
+    updateUnsavedIndicator();
+    reinitComponents();
     toast('success', 'Environment updated', 'Variables will be saved when you deploy to crontab.');
   },
 
@@ -900,10 +1031,11 @@ const App = {
 
   openNewJob() {
     editingJobId = null;
+    clearJobFormErrors();
     document.getElementById('job-dialog-title').textContent = 'New job';
     document.getElementById('job-name').value = '';
     document.getElementById('job-command').value = '';
-    document.getElementById('job-logging').checked = false;
+    document.getElementById('job-logging').checked = true;
     document.getElementById('mail-transporter').value = '';
     document.getElementById('mail-options').value = '';
     if (window.config) {
@@ -922,6 +1054,7 @@ const App = {
     const job = state.jobs.find((j) => j.id === id);
     if (!job) return;
     editingJobId = id;
+    clearJobFormErrors();
     document.getElementById('job-dialog-title').textContent = 'Edit job';
     document.getElementById('job-name').value = job.name || '';
     document.getElementById('job-command').value = job.command;
@@ -939,13 +1072,24 @@ const App = {
   },
 
   async saveJob() {
+    clearJobFormErrors();
+    const name = document.getElementById('job-name').value.trim();
+    if (!name) {
+      showFieldError('job-name', 'Name is required.');
+      return;
+    }
     const commandRaw = document.getElementById('job-command').value;
     const command = collapsedCommand(commandRaw);
     if (!command) {
-      toast('error', 'Validation error', 'Command is required.');
+      showFieldError('job-command', 'Command is required.');
       return;
     }
     const schedule = getScheduleValue();
+    const scheduleError = validateCronSchedule(schedule);
+    if (scheduleError) {
+      showFieldError('job-cron', scheduleError);
+      return;
+    }
     const transporter = document.getElementById('mail-transporter').value.trim();
     const optionsRaw = document.getElementById('mail-options').value.trim();
     let mailing = {};
@@ -953,13 +1097,13 @@ const App = {
       try {
         mailing = buildMailingPayload(transporter, optionsRaw);
       } catch {
-        toast('error', 'Invalid mail config', 'Mail options must be valid JSON.');
+        showFieldError('mail-options', 'Mail options must be valid JSON.');
         return;
       }
     }
 
     const payload = {
-      name: document.getElementById('job-name').value.trim(),
+      name,
       command,
       schedule,
       _id: editingJobId || -1,
@@ -972,7 +1116,11 @@ const App = {
       document.getElementById('job-dialog').close();
       reloadPage();
     } catch (err) {
-      toast('error', 'Save failed', err.message);
+      if (err.status === 400) {
+        showFieldError('job-cron', err.message);
+        return;
+      }
+      showFormSaveError(`Save failed. ${err.message}`);
     }
   },
 
@@ -998,7 +1146,7 @@ const App = {
     try {
       await apiPost('save', {
         _id: -1,
-        name: job.name ? `${job.name} (copy)` : '',
+        name: `${job.name || job.id} (copy)`,
         command: job.command,
         schedule: job.schedule,
         logging: job.logging ? 'true' : 'false',
@@ -1133,21 +1281,14 @@ const App = {
     );
   },
 
-  confirmSaveToCrontab() {
-    openConfirm(
-      'Save to crontab',
-      'Deploy environment variables and all enabled jobs to the system crontab?',
-      '<p>This writes to the system crontab and marks jobs as saved.</p>',
-      async () => {
-        try {
-          const envVars = document.getElementById('env-vars').value;
-          await apiGet('crontab', { env_vars: envVars });
-          reloadPage();
-        } catch (err) {
-          toast('error', 'Deploy failed', err.message);
-        }
-      }
-    );
+  async saveToCrontab() {
+    try {
+      const envVars = document.getElementById('env-vars').value;
+      await apiGet('crontab', { env_vars: envVars });
+      reloadPage();
+    } catch (err) {
+      toast('error', 'Deploy failed', err.message);
+    }
   },
 
   async openPreview() {

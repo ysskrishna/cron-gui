@@ -47,7 +47,13 @@
     <div class="list-toolbar">
       <div class="list-toolbar-actions">
         <button type="button" class="btn" data-size="sm" data-testid="new-job-btn" title="Add a new scheduled job" onclick="App.openNewJob()">New job</button>
-        <button type="button" class="btn" data-variant="outline" data-size="sm" title="Deploy env vars and enabled jobs to the system crontab" data-testid="save-crontab-btn" onclick="App.confirmSaveToCrontab()">Save to crontab</button>
+        <div id="deploy-cluster" class="deploy-cluster is-clean" data-testid="deploy-cluster">
+          <span id="unsaved-indicator" class="deploy-cluster__status" data-testid="unsaved-indicator" aria-live="polite" hidden>
+            <span class="deploy-cluster__dot" aria-hidden="true"></span>
+            <span id="unsaved-indicator-text"></span>
+          </span>
+          <button type="button" class="btn" data-variant="outline" data-size="sm" title="Deploy env vars and enabled jobs to the system crontab" data-testid="save-crontab-btn" onclick="App.saveToCrontab()">Save to crontab</button>
+        </div>
         <div id="actions-menu" class="dropdown-menu">
           <button type="button" id="actions-trigger" aria-haspopup="menu" aria-controls="actions-menu-list" aria-expanded="false" class="btn" data-variant="outline" data-size="sm" title="System crontab sync, server backups, and database import/export">Actions</button>
           <div data-popover aria-hidden="true" class="w-52">
@@ -62,7 +68,7 @@
           <option value="all">All</option>
           <option value="active">Active</option>
           <option value="unsaved">Unsaved</option>
-          <option value="error">Error</option>
+          <option value="error">Failed run</option>
           <option value="disabled">Disabled</option>
         </select>
         <button type="button" id="clear-filters-btn" class="btn hidden" data-variant="outline" data-size="sm" title="Clear search and status filter" onclick="App.clearFilters()">Clear filters</button>
@@ -161,8 +167,9 @@
       <section>
         <div class="job-form">
           <div role="group" class="field">
-            <label for="job-name">Name (optional)</label>
-            <input type="text" id="job-name" data-testid="job-name" placeholder="daily-backup" />
+            <label for="job-name">Name</label>
+            <input type="text" id="job-name" data-testid="job-name" placeholder="daily-backup" required aria-describedby="job-name-error" />
+            <p id="job-name-error" class="field-error hidden" role="alert" data-testid="job-name-error"></p>
           </div>
           <div role="group" class="field">
             <label for="schedule-preset">Schedule preset</label>
@@ -172,11 +179,13 @@
           </div>
           <div role="group" class="field">
             <label for="job-cron">Cron expression</label>
-            <input type="text" id="job-cron" data-testid="job-cron" value="* * * * *" spellcheck="false" autocomplete="off" />
+            <input type="text" id="job-cron" data-testid="job-cron" value="* * * * *" spellcheck="false" autocomplete="off" aria-describedby="job-cron-error" />
+            <p id="job-cron-error" class="field-error hidden" role="alert" data-testid="job-cron-error"></p>
           </div>
           <div role="group" class="field">
             <label for="job-command">Command</label>
-            <textarea id="job-command" data-testid="job-command" rows="4" placeholder="/usr/local/bin/backup.sh"></textarea>
+            <textarea id="job-command" data-testid="job-command" rows="4" placeholder="/usr/local/bin/backup.sh" aria-describedby="job-command-error"></textarea>
+            <p id="job-command-error" class="field-error hidden" role="alert" data-testid="job-command-error"></p>
           </div>
 
           <details class="job-advanced" id="job-advanced">
@@ -192,11 +201,13 @@
               </div>
               <div role="group" class="field">
                 <label for="mail-options">Mail config (JSON)</label>
-                <textarea id="mail-options" rows="8" placeholder='{"from":"cron@example.com","to":"admin@example.com"}'></textarea>
+                <textarea id="mail-options" rows="8" placeholder='{"from":"cron@example.com","to":"admin@example.com"}' aria-describedby="mail-options-error"></textarea>
+                <p id="mail-options-error" class="field-error hidden" role="alert" data-testid="mail-options-error"></p>
                 <p class="job-advanced-note">Based on nodemailer. Configure transporter and mail options as JSON.</p>
               </div>
             </div>
           </details>
+          <p id="job-form-save-error" class="field-error form-save-error hidden" role="alert" data-testid="job-form-save-error"></p>
         </div>
       </section>
       <footer>

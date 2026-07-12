@@ -44,6 +44,35 @@ function buildCrontab(name, command, schedule, stopped, logging, mailing) {
   };
 }
 
+const CRON_MACROS = new Set([
+  '@reboot', '@yearly', '@annually', '@monthly', '@weekly', '@daily', '@hourly', '@midnight',
+]);
+
+exports.validateSchedule = (schedule) => {
+  const trimmed = String(schedule || '').trim();
+  if (!trimmed) return 'Cron expression is required.';
+
+  if (trimmed.startsWith('@')) {
+    if (CRON_MACROS.has(trimmed.toLowerCase())) return null;
+    return `Unknown schedule macro "${trimmed}".`;
+  }
+
+  const parts = trimmed.split(/\s+/);
+  if (parts.length !== 5) {
+    if (parts.length > 5) {
+      return 'Too many fields. Cron uses 5 fields only — put your command in the Command field.';
+    }
+    return 'Cron needs 5 fields: minute hour day month weekday.';
+  }
+
+  try {
+    CronExpressionParser.parse(trimmed);
+    return null;
+  } catch (e) {
+    return (e.message || 'Invalid cron expression.').replace(/^Error: /, '');
+  }
+};
+
 function makeCommand(tab) {
   const stderr = path.join(cronPath, `${tab._id}.stderr`);
   const stdout = path.join(cronPath, `${tab._id}.stdout`);
@@ -60,8 +89,8 @@ function makeCommand(tab) {
   result = `(${result})`;
 
   if (tab.logging && tab.logging === 'true') {
-    result += `; if test -f ${stderr}; then date >> "${logFile}"; cat ${stderr} >> "${logFile}"; fi`;
-    result += `; if test -f ${stdout}; then date >> "${logFileStdout}"; cat ${stdout} >> "${logFileStdout}"; fi`;
+    result += `; if test -s ${stderr}; then date >> "${logFile}"; cat ${stderr} >> "${logFile}"; fi`;
+    result += `; if test -s ${stdout}; then date >> "${logFileStdout}"; cat ${stdout} >> "${logFileStdout}"; fi`;
   }
 
   if (tab.mailing && JSON.stringify(tab.mailing) !== '{}') {
@@ -106,6 +135,21 @@ exports.remove = (_id) => {
   db.remove({ _id }, {});
 };
 
+const LOG_TIMESTAMP_RE = /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}/;
+
+function logHasErrorContent(logFile) {
+  try {
+    const lines = fs.readFileSync(logFile, 'utf8').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    return lines.some((line) => !LOG_TIMESTAMP_RE.test(line));
+  } catch {
+    return false;
+  }
+}
+
+function jobHasStderrLog(id) {
+  return logHasErrorContent(path.join(logFolder, `${id}.log`));
+}
+
 exports.crontabs = (callback) => {
   db.find({}).sort({ created: -1 }).exec((err, docs) => {
     if (err) {
@@ -113,6 +157,7 @@ exports.crontabs = (callback) => {
       return callback([]);
     }
     for (const doc of docs) {
+      doc.hasError = doc.logging === 'true' && jobHasStderrLog(doc._id);
       if (doc.schedule === '@reboot') {
         doc.next = 'Next Reboot';
       } else {
