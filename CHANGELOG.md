@@ -5,6 +5,21 @@ All notable changes to `cron-gui` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).  
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-07-12
+
+Release automation docs and CI publish triggers on tag push.
+
+### Added
+
+- `AGENTS.md` with semver guidance, full diff review steps, and release workflow for agents
+
+### Changed
+
+- **Publish Docker** workflow: trigger on `v*` tag push; resolve release tag from `github.ref_name` when not a GitHub Release event; treat hyphenated tags as prereleases
+- **Publish npm** workflow: same tag-push trigger and tag/prerelease handling as Docker
+
+[0.1.1]: https://github.com/ysskrishna/cron-gui/releases/tag/v0.1.1
+
 ## [0.1.0] - 2026-07-12
 
 First preview release of **Cron GUI**.

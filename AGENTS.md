@@ -6,7 +6,21 @@ When the user asks to **bump the version**, **prepare a release**, or similar:
 
 ### 1. Propose a version — do not edit files yet
 
-Read the current version in `package.json` and recent changes (git log, session work, `CHANGELOG.md`).
+Read the current version in `package.json` and **every change since the last release tag** — not just the latest commit or commit count.
+
+**Find the last tag** (e.g. `git tag -l 'v*' --sort=-v:refname | head -1`).
+
+**Review all changes since that tag:**
+
+```bash
+git log <last-tag>..HEAD --oneline
+git diff <last-tag>..HEAD --stat
+git diff <last-tag>..HEAD          # read the full diff for notable changes
+git status                         # include uncommitted / unstaged work
+git diff                           # uncommitted changes vs HEAD
+```
+
+Do **not** summarize from commit messages alone. One commit can touch many files; read the diff and group changes by user impact (Added / Changed / Fixed / Removed).
 
 Suggest the next **MAJOR.MINOR.PATCH** using [Semantic Versioning](https://semver.org/):
 
@@ -25,7 +39,8 @@ If the user names a version, use it (still confirm if it breaks semver expectati
 Update:
 
 1. **`package.json`** — `"version"` field
-2. **`CHANGELOG.md`** — new section at the top (below the header), [Keep a Changelog](https://keepachangelog.com/) style:
+2. **`package-lock.json`** — top-level `"version"` and `packages[""].version` (run `npm install` only if deps changed; otherwise edit both fields to match)
+3. **`CHANGELOG.md`** — new section at the top (below the header), [Keep a Changelog](https://keepachangelog.com/) style:
 
 ```markdown
 ## [1.2.3] - YYYY-MM-DD
@@ -44,7 +59,7 @@ Short summary line.
 [1.2.3]: https://github.com/ysskrishna/cron-gui/releases/tag/v1.2.3
 ```
 
-Use today's date. Summarize changes since the last release from git history or the current task. Omit empty sections.
+Use today's date. Summarize **all** changes since the last release tag (see step 1 commands), including uncommitted work if it will ship in this release. Omit empty sections.
 
 Do **not** run `make release`, create git tags, or publish unless the user explicitly asks.
 
@@ -58,7 +73,7 @@ Do **not** run `make release`, create git tags, or publish unless the user expli
 Suggest this sequence (adjust version as needed):
 
 ```bash
-git add package.json CHANGELOG.md
+git add package.json package-lock.json CHANGELOG.md
 git commit -m "chore: release v1.2.3"
 git push origin main
 make release
