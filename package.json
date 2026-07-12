@@ -21,7 +21,8 @@
     "views/index.ejs",
     "LICENSE",
     "README.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "docs/screenshots/**"
   ],
   "dependencies": {
     "@seald-io/nedb": "^4.1.2",

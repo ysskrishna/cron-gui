@@ -4,4 +4,5 @@ crontabs/*.db
 crontabs/logs/*.log
 test-results/
 playwright-report/
+docs/screenshots/frames/
 workspace/
