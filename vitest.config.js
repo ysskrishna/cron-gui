@@ -5,9 +5,10 @@ const { defineConfig } = require('vitest/config');
 module.exports = defineConfig({
   test: {
     globals: true,
-    include: ['tests/**/*.js'],
-    exclude: ['tests/e2e/**'],
-    testTimeout: 10000,
-    hookTimeout: 10000,
+    include: ['tests/**/*.test.js'],
+    exclude: ['tests/e2e/**', 'tests/helpers/**'],
+    fileParallelism: false,
+    testTimeout: 15000,
+    hookTimeout: 15000,
   },
 });

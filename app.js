@@ -265,42 +265,44 @@ const server = startHttpsServer
   ? https.createServer(credentials, app)
   : http.createServer(app);
 
-server.listen(app.get('port'), app.get('host'), () => {
-  console.log('Node version:', process.versions.node);
+if (process.env.CRON_GUI_TEST !== '1') {
+  server.listen(app.get('port'), app.get('host'), () => {
+    console.log('Node version:', process.versions.node);
 
-  fs.access(crontab.db_folder, fs.constants.W_OK, (err) => {
-    if (err) {
-      console.error('Write access to', crontab.db_folder, 'DENIED.');
-      process.exit(1);
-    }
-  });
-
-  if (process.argv.includes('--autosave') || process.env.ENABLE_AUTOSAVE) {
-    crontab.autosave_crontab(() => {});
-    fs.watchFile(crontab.crontab_db_file, () => {
-      crontab.autosave_crontab(() => {
-        console.log('Attempted to autosave crontab');
-      });
-    });
-  }
-
-  if (process.argv.includes('--reset')) {
-    console.log('Resetting cron-gui');
-
-    for (const file of [crontab.crontab_db_file, crontab.env_file]) {
-      console.log(`Deleting ${file}`);
-      try {
-        fs.unlinkSync(file);
-      } catch (_e) {
-        console.log(`Unable to delete ${file}`);
+    fs.access(crontab.db_folder, fs.constants.W_OK, (err) => {
+      if (err) {
+        console.error('Write access to', crontab.db_folder, 'DENIED.');
+        process.exit(1);
       }
+    });
+
+    if (process.argv.includes('--autosave') || process.env.ENABLE_AUTOSAVE) {
+      crontab.autosave_crontab(() => {});
+      fs.watchFile(crontab.crontab_db_file, () => {
+        crontab.autosave_crontab(() => {
+          console.log('Attempted to autosave crontab');
+        });
+      });
     }
 
-    crontab.reload_db();
-  }
+    if (process.argv.includes('--reset')) {
+      console.log('Resetting cron-gui');
 
-  const protocol = startHttpsServer ? 'https' : 'http';
-  console.log(`Cron GUI (${packageJson.version}) is running at ${protocol}://${app.get('host')}:${app.get('port')}${baseUrl}`);
-});
+      for (const file of [crontab.crontab_db_file, crontab.env_file]) {
+        console.log(`Deleting ${file}`);
+        try {
+          fs.unlinkSync(file);
+        } catch (_e) {
+          console.log(`Unable to delete ${file}`);
+        }
+      }
+
+      crontab.reload_db();
+    }
+
+    const protocol = startHttpsServer ? 'https' : 'http';
+    console.log(`Cron GUI (${packageJson.version}) is running at ${protocol}://${app.get('host')}:${app.get('port')}${baseUrl}`);
+  });
+}
 
 module.exports = app;
