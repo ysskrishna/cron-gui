@@ -1,6 +1,9 @@
 name: Publish npm
 
 on:
+  push:
+    tags:
+      - "v*"
   release:
     types: [published]
   workflow_dispatch:
@@ -16,7 +19,7 @@ on:
         default: false
 
 concurrency:
-  group: publish-npm-${{ github.event.release.tag_name || github.event.inputs.tag }}
+  group: publish-npm-${{ github.event.release.tag_name || github.ref_name || github.event.inputs.tag }}
   cancel-in-progress: false
 
 permissions:
@@ -24,8 +27,8 @@ permissions:
   id-token: write
 
 env:
-  RELEASE_TAG: ${{ github.event.release.tag_name || github.event.inputs.tag }}
-  IS_PRERELEASE: ${{ (github.event_name == 'release' && github.event.release.prerelease) || (github.event_name == 'workflow_dispatch' && github.event.inputs.prerelease) }}
+  RELEASE_TAG: ${{ github.event.release.tag_name || github.ref_name || github.event.inputs.tag }}
+  IS_PRERELEASE: ${{ (github.event_name == 'release' && github.event.release.prerelease) || (github.event_name == 'workflow_dispatch' && github.event.inputs.prerelease) || (github.event_name == 'push' && contains(github.ref_name, '-')) }}
 
 jobs:
   publish:

@@ -1,6 +1,9 @@
 name: Publish Docker
 
 on:
+  push:
+    tags:
+      - "v*"
   release:
     types: [published]
   workflow_dispatch:
@@ -16,7 +19,7 @@ on:
         default: false
 
 concurrency:
-  group: publish-docker-${{ github.event.release.tag_name || github.event.inputs.tag }}
+  group: publish-docker-${{ github.event.release.tag_name || github.ref_name || github.event.inputs.tag }}
   cancel-in-progress: false
 
 permissions:
@@ -24,9 +27,9 @@ permissions:
 
 env:
   IMAGE_NAME: ysskrishna/cron-gui
-  RELEASE_TAG: ${{ github.event.release.tag_name || github.event.inputs.tag }}
-  IS_PRERELEASE: ${{ (github.event_name == 'release' && github.event.release.prerelease) || (github.event_name == 'workflow_dispatch' && github.event.inputs.prerelease) }}
-  DOCKER_CACHE_SCOPE: release-${{ github.event.release.tag_name || github.event.inputs.tag }}
+  RELEASE_TAG: ${{ github.event.release.tag_name || github.ref_name || github.event.inputs.tag }}
+  IS_PRERELEASE: ${{ (github.event_name == 'release' && github.event.release.prerelease) || (github.event_name == 'workflow_dispatch' && github.event.inputs.prerelease) || (github.event_name == 'push' && contains(github.ref_name, '-')) }}
+  DOCKER_CACHE_SCOPE: release-${{ github.event.release.tag_name || github.ref_name || github.event.inputs.tag }}
 
 jobs:
   publish:
