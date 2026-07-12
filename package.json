@@ -1,7 +1,7 @@
 {
   "name": "cron-gui",
-  "version": "0.5.0",
-  "description": "Modern UI for managing your crontab file",
+  "version": "0.1.0",
+  "description": "Modern web UI for managing your crontab file",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
@@ -9,6 +9,20 @@
     "test:watch": "vitest",
     "lint": "eslint ."
   },
+  "files": [
+    "app.js",
+    "crontab.js",
+    "restore.js",
+    "routes.js",
+    "bin/",
+    "config/",
+    "middleware/",
+    "public/",
+    "views/index.ejs",
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md"
+  ],
   "dependencies": {
     "@seald-io/nedb": "^4.1.2",
     "connect-busboy": "^1.0.0",
@@ -40,12 +54,17 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/alseambusher/crontab-ui"
+    "url": "git+https://github.com/ysskrishna/cron-gui.git"
   },
+  "bugs": {
+    "url": "https://github.com/ysskrishna/cron-gui/issues"
+  },
+  "homepage": "https://github.com/ysskrishna/cron-gui#readme",
   "keywords": [
-    "Crontab",
-    "node",
-    "cron-gui"
+    "crontab",
+    "cron",
+    "cron-gui",
+    "scheduler"
   ],
   "author": "Suresh Alse",
   "license": "MIT"

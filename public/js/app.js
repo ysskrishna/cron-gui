@@ -1,6 +1,6 @@
 'use strict';
 
-/* global window, document, fetch, location, navigator, URL, FormData */
+/* global window, document, fetch, location, navigator, URL */
 
 const STORAGE_KEY = 'cron-gui-ui-v1';
 
@@ -35,7 +35,6 @@ const ICONS = {
 
 let routes = {};
 let editingJobId = null;
-let pendingRestoreId = null;
 let confirmCallback = null;
 
 function defaultUiState() {
@@ -269,6 +268,70 @@ function paginatedJobs() {
   const jobs = filteredJobs();
   const start = (state.ui.page - 1) * state.ui.pageSize;
   return jobs.slice(start, start + state.ui.pageSize);
+}
+
+function hasUnsavedWork() {
+  const envDirty = document.getElementById('env-vars').value !== state.envVars;
+  const jobsUnsaved = state.jobs.some((job) => !job.saved);
+  return envDirty || jobsUnsaved;
+}
+
+function paginationItems(current, total) {
+  if (total <= 1) return [];
+  const items = [];
+  const windowSize = 5;
+  let start = Math.max(1, current - Math.floor(windowSize / 2));
+  const end = Math.min(total, start + windowSize - 1);
+  start = Math.max(1, end - windowSize + 1);
+
+  items.push({ type: 'prev', page: current - 1, disabled: current === 1 });
+  if (start > 1) {
+    items.push({ type: 'page', page: 1 });
+    if (start > 2) items.push({ type: 'ellipsis' });
+  }
+  for (let p = start; p <= end; p++) {
+    items.push({ type: 'page', page: p });
+  }
+  if (end < total) {
+    if (end < total - 1) items.push({ type: 'ellipsis' });
+    items.push({ type: 'page', page: total });
+  }
+  items.push({ type: 'next', page: current + 1, disabled: current === total });
+  return items;
+}
+
+function renderPaginationControls(pagination, totalPages) {
+  pagination.innerHTML = '';
+  if (totalPages <= 1) return;
+
+  paginationItems(state.ui.page, totalPages).forEach((item) => {
+    if (item.type === 'ellipsis') {
+      const span = document.createElement('span');
+      span.className = 'pagination-ellipsis';
+      span.textContent = '…';
+      pagination.appendChild(span);
+      return;
+    }
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn';
+    btn.dataset.size = 'sm';
+
+    if (item.type === 'page') {
+      btn.dataset.variant = item.page === state.ui.page ? 'default' : 'outline';
+      btn.textContent = String(item.page);
+      btn.disabled = item.page === state.ui.page;
+      btn.dataset.testid = 'page-btn';
+      btn.onclick = () => { state.ui.page = item.page; saveUiState(); renderJobs(); };
+    } else {
+      btn.dataset.variant = 'outline';
+      btn.textContent = item.type === 'prev' ? 'Prev' : 'Next';
+      btn.disabled = item.disabled;
+      btn.onclick = () => { state.ui.page = item.page; saveUiState(); renderJobs(); };
+    }
+    pagination.appendChild(btn);
+  });
 }
 
 function hasActiveFilters() {
@@ -616,19 +679,7 @@ function renderJobs() {
       : 'Showing 0 jobs';
 
   const pagination = document.getElementById('pagination');
-  pagination.innerHTML = '';
-  for (let p = 1; p <= totalPages; p++) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'btn';
-    btn.dataset.variant = p === state.ui.page ? 'default' : 'outline';
-    btn.dataset.size = 'sm';
-    btn.textContent = String(p);
-    btn.disabled = p === state.ui.page;
-    btn.dataset.testid = 'page-btn';
-    btn.onclick = () => { state.ui.page = p; saveUiState(); renderJobs(); };
-    pagination.appendChild(btn);
-  }
+  renderPaginationControls(pagination, totalPages);
 }
 
 const App = {
@@ -729,6 +780,13 @@ const App = {
         }
       );
     });
+
+    const restoreParam = new URLSearchParams(window.location.search).get('restore');
+    if (restoreParam) {
+      const cleanUrl = window.location.pathname + window.location.hash;
+      window.history.replaceState({}, '', cleanUrl);
+      App.openRestorePreview(restoreParam);
+    }
   },
 
   saveEnvVars() {
@@ -1021,7 +1079,6 @@ const App = {
   },
 
   async openRestorePreview(id) {
-    pendingRestoreId = id;
     try {
       const res = await apiGet('restore_data', { db: id });
       const docs = await res.json();
@@ -1091,6 +1148,7 @@ const App = {
       const res = await apiGet('preview_crontab');
       const text = await res.text();
       document.getElementById('preview-content').textContent = text || '# (empty crontab)';
+      document.getElementById('preview-unsaved-alert').classList.toggle('hidden', !hasUnsavedWork());
       document.getElementById('preview-dialog').showModal();
     } catch (err) {
       toast('error', 'Preview failed', err.message);

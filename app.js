@@ -67,8 +67,6 @@ app.use(express.urlencoded({ extended: true }));
 app.use(busboy());
 
 app.use(baseUrl, express.static(path.join(__dirname, 'public')));
-app.use(baseUrl, express.static(path.join(__dirname, 'public', 'css')));
-app.use(baseUrl, express.static(path.join(__dirname, 'public', 'js')));
 app.use(baseUrl, express.static(path.join(__dirname, 'config')));
 
 app.set('host', process.env.HOST || '127.0.0.1');
@@ -133,14 +131,8 @@ app.get(routes.backup, (req, res, next) => {
 });
 
 app.get(routes.restore, validateDbParam, (req, res) => {
-  restore.crontabs(req.query.db, (docs) => {
-    res.render('restore', {
-      routes: JSON.stringify(routesRelative),
-      crontabs: JSON.stringify(docs),
-      backups: crontab.get_backup_names(),
-      db: req.query.db,
-    });
-  });
+  const root = routes.root.endsWith('/') ? routes.root : `${routes.root}/`;
+  res.redirect(`${root}?restore=${encodeURIComponent(req.query.db)}`);
 });
 
 app.get(routes.restore_data, validateDbParam, (req, res) => {
@@ -199,34 +191,34 @@ app.get(routes.preview_crontab, (req, res) => {
   });
 });
 
-function sendLog(filePath, req, res) {
+function sendLog(filePath, emptyMessage, res) {
   if (fs.existsSync(filePath)) {
     res.type('text/plain');
     res.set('Cache-Control', 'no-store');
     res.sendFile(filePath);
   } else {
-    res.type('text/plain').send('No errors logged yet');
+    res.type('text/plain').send(emptyMessage);
   }
 }
 
 app.get(routes.logger, validateIdParam, (req, res) => {
-  sendLog(path.join(crontab.log_folder, `${req.query.id}.log`), req, res);
+  sendLog(path.join(crontab.log_folder, `${req.query.id}.log`), 'No errors logged yet', res);
 });
 
 app.get(routes.stdout, validateIdParam, (req, res) => {
-  sendLog(path.join(crontab.log_folder, `${req.query.id}.stdout.log`), req, res);
+  sendLog(path.join(crontab.log_folder, `${req.query.id}.stdout.log`), 'No output logged yet', res);
 });
 
 // error handler
 app.use(errorHandler);
 
 process.on('SIGINT', () => {
-  console.log('Exiting crontab-ui');
+  console.log('Exiting cron-gui');
   process.exit();
 });
 
 process.on('SIGTERM', () => {
-  console.log('Exiting crontab-ui');
+  console.log('Exiting cron-gui');
   process.exit();
 });
 
@@ -254,7 +246,7 @@ server.listen(app.get('port'), app.get('host'), () => {
   }
 
   if (process.argv.includes('--reset')) {
-    console.log('Resetting crontab-ui');
+    console.log('Resetting cron-gui');
 
     for (const file of [crontab.crontab_db_file, crontab.env_file]) {
       console.log(`Deleting ${file}`);
@@ -269,7 +261,7 @@ server.listen(app.get('port'), app.get('host'), () => {
   }
 
   const protocol = startHttpsServer ? 'https' : 'http';
-  console.log(`Crontab UI (${packageJson.version}) is running at ${protocol}://${app.get('host')}:${app.get('port')}${baseUrl}`);
+  console.log(`Cron GUI (${packageJson.version}) is running at ${protocol}://${app.get('host')}:${app.get('port')}${baseUrl}`);
 });
 
 module.exports = app;

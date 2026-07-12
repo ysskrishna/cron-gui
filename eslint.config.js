@@ -4,15 +4,7 @@ const globals = require('globals');
 
 module.exports = [
   {
-    ignores: [
-      'node_modules/**',
-      'public/js/jquery.min.js',
-      'public/js/bootstrap.bundle.min.js',
-      'public/js/dataTables.min.js',
-      'public/js/dataTables.bootstrap5.min.js',
-      'public/js/jquery.js',
-      'public/js/bootstrap.min.js',
-    ],
+    ignores: ['node_modules/**'],
   },
   {
     files: ['**/*.js'],
@@ -33,23 +25,15 @@ module.exports = [
     },
   },
   {
-    files: ['public/js/script.js'],
+    files: ['public/js/app.js'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'script',
       globals: {
         ...globals.browser,
-        ...globals.jquery,
-        bootstrap: 'readonly',
-        config: 'readonly',
-        routes: 'writable',
-        crontabs: 'writable',
       },
     },
     rules: {
-      'no-unused-vars': 'off',
-      'no-var': 'off',
-      'prefer-const': 'off',
       'strict': 'off',
     },
   },

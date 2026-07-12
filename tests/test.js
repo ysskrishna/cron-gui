@@ -17,7 +17,7 @@ process.env.HOST = '127.0.0.1';
 
 const app = require('../app');
 
-describe('Crontab UI', () => {
+describe('Cron GUI', () => {
   afterAll(() => {
     fs.rmSync(testDbPath, { recursive: true, force: true });
   });
@@ -26,7 +26,7 @@ describe('Crontab UI', () => {
     it('should return the main page', async () => {
       const res = await request(app).get('/');
       expect(res.status).toBe(200);
-      expect(res.text).toContain('Crontab UI');
+      expect(res.text).toContain('Cron GUI');
       expect(res.text).toContain('New job');
     });
   });
@@ -100,6 +100,29 @@ describe('Crontab UI', () => {
       const res = await request(app).get('/export');
       expect(res.status).toBe(200);
       expect(res.headers['content-disposition']).toContain('crontab.db');
+    });
+  });
+
+  describe('POST /save (update)', () => {
+    it('should preserve stopped state when editing a job', async () => {
+      const page = await request(app).get('/');
+      const match = page.text.match(/data-job-id="([^"]+)"/);
+      const jobId = match ? match[1] : null;
+      if (!jobId) return;
+
+      await request(app).post('/stop').send({ _id: jobId });
+      await request(app).post('/save').send({
+        _id: jobId,
+        name: 'updated-name',
+        command: 'echo updated',
+        schedule: '* * * * *',
+        logging: 'false',
+        mailing: {},
+      });
+
+      const after = await request(app).get('/');
+      expect(after.text).toContain('updated-name');
+      expect(after.text).toContain('data-variant="secondary">Disabled</span>');
     });
   });
 
@@ -177,7 +200,8 @@ describe('Crontab UI', () => {
 
     it('should allow valid db param', async () => {
       const res = await request(app).get('/restore?db=crontab.db');
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(302);
+      expect(res.headers.location).toContain('restore=crontab.db');
     });
 
     it('should allow valid id param', async () => {
@@ -239,10 +263,10 @@ describe('Crontab UI', () => {
   });
 
   describe('GET /stdout', () => {
-    it('should return no errors message when no log exists', async () => {
+    it('should return no output message when no log exists', async () => {
       const res = await request(app).get('/stdout?id=nonexistent');
       expect(res.status).toBe(200);
-      expect(res.text).toContain('No errors logged yet');
+      expect(res.text).toContain('No output logged yet');
     });
 
     it('should return text/plain content type when no log exists', async () => {

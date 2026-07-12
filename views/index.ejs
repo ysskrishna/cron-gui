@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Crontab UI</title>
+  <title>Cron GUI</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -17,7 +17,7 @@
         <span class="brand-icon" aria-hidden="true">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         </span>
-        <span>Crontab UI</span>
+        <span>Cron GUI</span>
       </div>
       <div class="topbar-actions">
         <button type="button" class="btn" data-variant="ghost" data-size="icon-sm" aria-label="Settings" title="Environment variables (PATH, MAILTO, etc.) — stored in env.db, separate from jobs" onclick="document.getElementById('settings-drawer').showModal()">
@@ -27,7 +27,7 @@
           <svg id="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
           <svg id="theme-icon-moon" class="hidden" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
         </button>
-        <a class="github-link" href="https://github.com/alseambusher/crontab-ui" target="_blank" rel="noreferrer">GitHub</a>
+        <a class="github-link" href="https://github.com/ysskrishna/cron-gui" target="_blank" rel="noreferrer">GitHub</a>
       </div>
     </header>
 
@@ -170,10 +170,9 @@
             <summary>Advanced</summary>
             <div class="job-advanced-body">
               <label class="job-logging-row" for="job-logging">
-                <input type="checkbox" id="job-logging" checked />
-                Enable error logging
+                <input type="checkbox" id="job-logging" />
+                Log stdout and stderr
               </label>
-              <p class="job-advanced-note">Based on nodemailer. Configure transporter and mail options as JSON.</p>
               <div role="group" class="field">
                 <label for="mail-transporter">Transporter</label>
                 <input type="text" id="mail-transporter" placeholder="smtp://user:pass@smtp.example.com:587" />
@@ -181,6 +180,7 @@
               <div role="group" class="field">
                 <label for="mail-options">Mail config (JSON)</label>
                 <textarea id="mail-options" rows="8" placeholder='{"from":"cron@example.com","to":"admin@example.com"}'></textarea>
+                <p class="job-advanced-note">Based on nodemailer. Configure transporter and mail options as JSON.</p>
               </div>
             </div>
           </details>
@@ -204,7 +204,7 @@
         <p>Preview of what will be deployed to the system crontab.</p>
       </header>
       <section>
-        <div class="alert" style="margin-bottom:1rem">
+        <div id="preview-unsaved-alert" class="alert hidden" style="margin-bottom:1rem">
           <h2>Unsaved changes</h2>
           <section>This preview may differ from the active crontab if you have unsaved changes.</section>
         </div>

@@ -99,7 +99,7 @@ exports.create_new = (name, command, schedule, logging, mailing) => {
 exports.update = (data) => {
   const tab = buildCrontab(data.name, data.command, data.schedule, null, data.logging, data.mailing);
   tab.saved = false;
-  db.update({ _id: data._id }, tab);
+  db.update({ _id: data._id }, { $set: tab });
 };
 
 exports.status = (_id, stopped) => {
