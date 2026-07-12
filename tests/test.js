@@ -182,6 +182,11 @@ describe('Cron GUI', () => {
       expect(res.text).toContain('stderr');
     });
 
+    it('should include deploy markers in preview output', async () => {
+      const res = await request(app).get('/preview_crontab');
+      expect(res.text).toContain('# cron-gui:id=');
+    });
+
     it('should only include active (non-stopped) jobs', async () => {
       const page = await request(app).get('/');
       const match = page.text.match(/data-job-id="([^"]+)"/);
@@ -346,6 +351,133 @@ describe('Cron GUI', () => {
     });
   });
 
+  describe('Pending deploy after delete', () => {
+    it('should flag pending deploy when deleting a deployed job', async () => {
+      await request(app).post('/save').send({
+        _id: -1,
+        name: 'deployed-delete-test',
+        command: 'echo deployed-delete',
+        schedule: '* * * * *',
+        logging: 'false',
+        mailing: {},
+      });
+
+      const created = await request(app).get('/');
+      const idMatch = created.text.match(/data-job-id="([^"]+)"[^>]*>[\s\S]*?deployed-delete-test/);
+      if (!idMatch) return;
+      const jobId = idMatch[1];
+
+      await request(app).get('/crontab?env_vars=');
+      await new Promise((resolve) => { setTimeout(resolve, 100); });
+
+      await request(app).post('/remove').send({ _id: jobId });
+      await new Promise((resolve) => { setTimeout(resolve, 100); });
+
+      const after = await request(app).get('/');
+      expect(after.text).toContain('pendingDeletes: 1');
+      expect(after.text).toContain('data-pending-removal="true"');
+      expect(after.text).toContain('deployed-delete-test');
+      expect(after.text).toContain('Pending removal');
+    });
+
+    it('should not flag pending deploy when deleting an unsaved job', async () => {
+      await request(app).post('/save').send({
+        _id: -1,
+        name: 'unsaved-delete-test',
+        command: 'echo unsaved-delete',
+        schedule: '* * * * *',
+        logging: 'false',
+        mailing: {},
+      });
+
+      const created = await request(app).get('/');
+      const idMatch = created.text.match(/data-job-id="([^"]+)"[^>]*>[\s\S]*?unsaved-delete-test/);
+      if (!idMatch) return;
+      const jobId = idMatch[1];
+
+      await request(app).post('/remove').send({ _id: jobId });
+      await new Promise((resolve) => { setTimeout(resolve, 100); });
+
+      const after = await request(app).get('/');
+      expect(after.text).toContain('pendingDeletes: 0');
+      expect(after.text).not.toContain('unsaved-delete-test');
+    });
+  });
+
+  describe('POST /undelete', () => {
+    it('should restore a staged delete before deploy', async () => {
+      await request(app).post('/save').send({
+        _id: -1,
+        name: 'undelete-test',
+        command: 'echo undelete',
+        schedule: '* * * * *',
+        logging: 'false',
+        mailing: {},
+      });
+
+      const created = await request(app).get('/');
+      const idMatch = created.text.match(/data-job-id="([^"]+)"[^>]*>[\s\S]*?undelete-test/);
+      if (!idMatch) return;
+      const jobId = idMatch[1];
+
+      await request(app).get('/crontab?env_vars=');
+      await new Promise((resolve) => { setTimeout(resolve, 100); });
+
+      await request(app).post('/remove').send({ _id: jobId });
+      await new Promise((resolve) => { setTimeout(resolve, 100); });
+
+      const staged = await request(app).get('/');
+      expect(staged.text).toContain('data-pending-removal="true"');
+
+      await request(app).post('/undelete').send({ _id: jobId });
+      await new Promise((resolve) => { setTimeout(resolve, 100); });
+
+      const restored = await request(app).get('/');
+      expect(restored.text).toContain('undelete-test');
+      expect(restored.text).not.toContain('data-pending-removal="true"');
+      expect(restored.text).toContain('pendingDeletes: 0');
+    });
+  });
+
+  describe('GET /system_crontab', () => {
+    it('should return plain text system crontab', async () => {
+      const res = await request(app).get('/system_crontab');
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toMatch(/text\/plain/);
+    });
+  });
+
+  describe('GET /backups_list', () => {
+    it('should return backup names as JSON', async () => {
+      await request(app).get('/backup');
+      const res = await request(app).get('/backups_list');
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body)).toBe(true);
+    });
+  });
+
+  describe('POST /delete_backups', () => {
+    it('should delete multiple backup files', async () => {
+      await request(app).get('/backup');
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+      await request(app).get('/backup');
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      const backups = fs.readdirSync(testDbPath).filter((f) => f.startsWith('backup'));
+      if (backups.length < 2) return;
+
+      const toDelete = backups.slice(0, 2);
+      const res = await request(app).post('/delete_backups').send({ dbs: toDelete });
+      expect(res.status).toBe(200);
+
+      await new Promise((resolve) => { setTimeout(resolve, 100); });
+      const remaining = fs.readdirSync(testDbPath).filter((f) => f.startsWith('backup'));
+      toDelete.forEach((name) => {
+        expect(remaining).not.toContain(name);
+      });
+    });
+  });
+
   describe('Command textarea', () => {
     it('should render a textarea for the command field', async () => {
       const res = await request(app).get('/');
@@ -357,21 +489,143 @@ describe('Cron GUI', () => {
       const res = await request(app).get('/');
       expect(res.text).toContain('data-testid="deploy-cluster"');
       expect(res.text).toContain('data-testid="unsaved-indicator"');
+      expect(res.text).toContain('data-testid="preview-deploy-btn"');
+      expect(res.text).toContain('pendingDeleteJobs');
+      expect(res.text).toContain('system_crontab');
     });
   });
 
-  describe('Job error status', () => {
-    it('should flag jobs with stderr logs as hasError when logging is enabled', async () => {
+  describe('crontab deploy markers', () => {
+    const crontab = require('../crontab');
+
+    function uniqueJobCount(html) {
+      return new Set([...html.matchAll(/data-job-id="([^"]+)"/g)].map((m) => m[1])).size;
+    }
+
+    it('parseCrontabLine extracts marker and schedule', () => {
+      const line = crontab.formatCrontabJobLine({
+        _id: 'marker-job',
+        schedule: '* * * * *',
+        command: 'echo marker-test',
+        logging: 'false',
+        mailing: {},
+      });
+      const parsed = crontab.parseCrontabLine(line);
+      expect(parsed.markerId).toBe('marker-job');
+      expect(parsed.schedule).toBe('* * * * *');
+      expect(parsed.command).toContain('echo marker-test');
+    });
+
+    it('unwrapCronGuiCommand extracts the inner shell command', () => {
+      const wrapped = '(({ echo "test2"; } | tee /tmp/x.stdout) 3>&1 1>&2 2>&3 | tee /tmp/x.stderr) 3>&1 1>&2 2>&3';
+      expect(crontab.unwrapCronGuiCommand(wrapped)).toBe('echo "test2"');
+    });
+
+    it('should skip import for marked jobs already in the database', async () => {
       await request(app).post('/save').send({
         _id: -1,
-        name: 'error-job',
-        command: 'echo fail',
+        name: 'marker-skip-job',
+        command: 'echo marker-skip',
+        schedule: '* * * * *',
+        logging: 'false',
+        mailing: {},
+      });
+      const page = await request(app).get('/');
+      const idMatch = page.text.match(/marker-skip-job[\s\S]*?data-job-id="([^"]+)"/);
+      if (!idMatch) return;
+      const jobId = idMatch[1];
+
+      const line = crontab.formatCrontabJobLine({
+        _id: jobId,
+        schedule: '* * * * *',
+        command: 'echo marker-skip',
+        logging: 'false',
+        mailing: {},
+      });
+
+      const before = await request(app).get('/');
+      const countBefore = uniqueJobCount(before.text);
+
+      crontab.processImportLine(line, Date.now(), 0);
+      await new Promise((resolve) => { setTimeout(resolve, 150); });
+      crontab.reload_db();
+
+      const after = await request(app).get('/');
+      expect(uniqueJobCount(after.text)).toBe(countBefore);
+      expect((after.text.match(/marker-skip-job/g) || []).length).toBe(1);
+    });
+
+    it('should import external jobs without markers', async () => {
+      const prefix = Date.now();
+      crontab.processImportLine('0 2 * * * /usr/local/bin/external-backup.sh', prefix, 1);
+      await new Promise((resolve) => { setTimeout(resolve, 150); });
+      crontab.reload_db();
+
+      const res = await request(app).get('/');
+      expect(res.text).toContain('/usr/local/bin/external-backup.sh');
+    });
+
+    it('should recover marked jobs missing from the database', async () => {
+      const line = crontab.formatCrontabJobLine({
+        _id: 'recovered-marker-id',
+        schedule: '15 3 * * *',
+        command: 'echo recovered',
+        logging: 'false',
+        mailing: {},
+      });
+
+      crontab.processImportLine(line, Date.now(), 0);
+      await new Promise((resolve) => { setTimeout(resolve, 150); });
+      crontab.reload_db();
+
+      const res = await request(app).get('/');
+      expect(res.text).toContain('"_id":"recovered-marker-id"');
+      expect(res.text).toContain('echo recovered');
+      expect(res.text).not.toContain('recovered-marker-id.stdout');
+    });
+  });
+
+  describe('Invalid schedule status', () => {
+    it('should flag jobs with unparsable cron schedules', async () => {
+      const Datastore = require('@seald-io/nedb');
+      const db = new Datastore({ filename: path.join(testDbPath, 'crontab.db') });
+      await new Promise((resolve, reject) => {
+        db.loadDatabase((err) => (err ? reject(err) : resolve()));
+      });
+      await new Promise((resolve, reject) => {
+        db.insert({
+          _id: 'invalid-schedule-job',
+          name: 'invalid-schedule-job',
+          command: 'echo bad',
+          schedule: '* * * * * sa',
+          stopped: false,
+          saved: true,
+          logging: 'false',
+          mailing: {},
+          created: Date.now(),
+        }, (err) => (err ? reject(err) : resolve()));
+      });
+
+      const crontab = require('../crontab');
+      crontab.reload_db();
+
+      const res = await request(app).get('/');
+      expect(res.text).toContain('invalid-schedule-job');
+      expect(res.text).toContain('"next":"invalid"');
+      expect(res.text).not.toContain('Failed run');
+    });
+
+    it('should not use stderr logs as a job list status', async () => {
+      await request(app).post('/save').send({
+        _id: -1,
+        name: 'logged-job',
+        command: 'echo logged',
         schedule: '* * * * *',
         logging: 'true',
         mailing: {},
       });
       const page = await request(app).get('/');
-      const match = page.text.match(/data-job-id="([^"]+)"/);
+      const match = page.text.match(/logged-job[\s\S]*?data-job-id="([^"]+)"/);
       const jobId = match ? match[1] : null;
       if (!jobId) return;
 
@@ -379,28 +633,8 @@ describe('Cron GUI', () => {
       fs.writeFileSync(logFile, 'command failed\n');
 
       const res = await request(app).get('/');
-      expect(res.text).toContain('"hasError":true');
-    });
-
-    it('should not flag jobs when stderr log only has run timestamps', async () => {
-      await request(app).post('/save').send({
-        _id: -1,
-        name: 'clean-job',
-        command: 'echo ok',
-        schedule: '* * * * *',
-        logging: 'true',
-        mailing: {},
-      });
-      const page = await request(app).get('/');
-      const match = page.text.match(/data-job-id="([^"]+)"/);
-      const jobId = match ? match[1] : null;
-      if (!jobId) return;
-
-      const logFile = path.join(testDbPath, 'logs', `${jobId}.log`);
-      fs.writeFileSync(logFile, 'Sun Jul 12 14:30:00 IST 2026\nSun Jul 12 14:31:00 IST 2026\n');
-
-      const res = await request(app).get('/');
-      expect(res.text).not.toContain('"hasError":true');
+      expect(res.text).not.toContain('"hasError"');
+      expect(res.text).not.toContain('Failed run');
     });
   });
 });

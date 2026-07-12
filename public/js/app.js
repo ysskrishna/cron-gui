@@ -17,10 +17,11 @@ const QUICK_SCHEDULES = [
 ];
 
 const TOOLTIPS = {
-  getFromCrontab: 'Read the system crontab (crontab -l) and merge jobs into the app. Creates a backup first.',
-  previewCrontab: 'Preview the crontab text: env vars plus one line per enabled job',
+  importFromSystem: 'Read the system crontab (crontab -l) and merge external jobs into the app. Skips lines already deployed by Cron GUI. Creates a backup first.',
+  viewSystemCrontab: 'Read-only view of the active system crontab (crontab -l)',
+  previewDeploy: 'Preview the crontab text that Save to crontab will write: env vars plus one line per enabled job',
   createBackup: 'Copy crontab.db to a dated backup file on this server',
-  manageBackups: 'Browse server backups — restore overwrites crontab.db, or delete a backup file',
+  manageBackups: 'Browse server backups — restore overwrites crontab.db, or delete backup files',
   importDb: 'Upload a crontab.db file from your computer. Creates a backup first.',
   exportDb: 'Download crontab.db to your computer',
 };
@@ -47,6 +48,7 @@ function defaultUiState() {
     sortDir: 'asc',
     statusFilter: 'all',
     selectedIds: [],
+    backupSelectedIds: [],
     commandColWidth: 28,
   };
 }
@@ -55,7 +57,9 @@ function loadUiState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultUiState();
-    return { ...defaultUiState(), ...JSON.parse(raw) };
+    const ui = { ...defaultUiState(), ...JSON.parse(raw) };
+    if (ui.statusFilter === 'error') ui.statusFilter = 'invalid';
+    return ui;
   } catch {
     return defaultUiState();
   }
@@ -71,7 +75,7 @@ function parseBackupDate(name) {
   return new Date(t.substring(0, t.length - 3)).valueOf();
 }
 
-function mapCrontabToJob(tab) {
+function mapCrontabToJob(tab, pendingRemoval = false) {
   const modifiedAt = tab.created || (tab.timestamp ? new Date(tab.timestamp).getTime() : Date.now());
   return {
     id: tab._id,
@@ -82,10 +86,12 @@ function mapCrontabToJob(tab) {
     human: tab.human || describeSchedule(tab.schedule),
     enabled: !tab.stopped,
     saved: !!tab.saved,
+    everDeployed: !!tab.everDeployed,
+    pendingRemoval,
     logging: tab.logging === 'true' || tab.logging === true,
     mailing: tab.mailing || {},
     modifiedAt,
-    hasError: !!tab.hasError,
+    invalidSchedule: tab.next === 'invalid',
   };
 }
 
@@ -100,8 +106,10 @@ function mapBackups(names) {
 function buildInitialState(bootstrap) {
   return {
     envVars: bootstrap.env || '',
-    jobs: (bootstrap.crontabs || []).map(mapCrontabToJob),
+    jobs: (bootstrap.crontabs || []).map((tab) => mapCrontabToJob(tab)),
+    pendingDeleteJobs: (bootstrap.pendingDeleteJobs || []).map((tab) => mapCrontabToJob(tab, true)),
     backups: mapBackups(bootstrap.backups),
+    pendingDeletes: bootstrap.pendingDeletes || 0,
     ui: loadUiState(),
   };
 }
@@ -154,10 +162,55 @@ function reloadPage() {
   location.reload();
 }
 
+function openModalDialogs() {
+  return [...document.querySelectorAll('dialog[open]')];
+}
+
+function toasterHost() {
+  const modal = openModalDialogs().at(-1);
+  if (!modal) return document.body;
+  return modal.querySelector(':scope > div') || modal;
+}
+
+function placeToaster() {
+  const toaster = document.getElementById('toaster');
+  if (!toaster) return;
+  const host = toasterHost();
+  if (toaster.parentElement !== host) host.appendChild(toaster);
+}
+
+function syncToasterLayer() {
+  const toaster = document.getElementById('toaster');
+  if (!toaster) return;
+
+  if (toaster.children.length > 0) {
+    placeToaster();
+    return;
+  }
+
+  if (toaster.parentElement !== document.body) {
+    document.body.appendChild(toaster);
+  }
+}
+
+function initToasterLayer() {
+  const toaster = document.getElementById('toaster');
+  if (!toaster) return;
+  new MutationObserver(syncToasterLayer).observe(toaster, { childList: true });
+  document.querySelectorAll('dialog').forEach((dialog) => {
+    dialog.addEventListener('close', syncToasterLayer);
+    new MutationObserver(syncToasterLayer).observe(dialog, {
+      attributes: true,
+      attributeFilter: ['open'],
+    });
+  });
+}
+
 function toast(category, title, description) {
   const toaster = document.getElementById('toaster');
   if (toaster && typeof toaster.toast === 'function') {
     toaster.toast({ category, title, description, cancel: { label: 'Dismiss' } });
+    syncToasterLayer();
   }
 }
 
@@ -293,14 +346,22 @@ function buildMailingPayload(transporter, optionsRaw) {
 }
 
 function statusCounts() {
-  const counts = { all: state.jobs.length, active: 0, unsaved: 0, error: 0, disabled: 0 };
+  const counts = {
+    all: state.jobs.length + state.pendingDeleteJobs.length,
+    active: 0,
+    unsaved: 0,
+    invalid: 0,
+    disabled: 0,
+    pendingRemoval: state.pendingDeleteJobs.length,
+  };
   state.jobs.forEach((job) => { counts[jobStatusKey(job)]++; });
   return counts;
 }
 
 function jobStatusKey(job) {
+  if (job.pendingRemoval) return 'pendingRemoval';
   if (!job.enabled) return 'disabled';
-  if (job.hasError) return 'error';
+  if (job.invalidSchedule) return 'invalid';
   if (!job.saved) return 'unsaved';
   return 'active';
 }
@@ -313,7 +374,7 @@ function sortedJobs(jobs) {
   const { sortColumn, sortDir } = state.ui;
   if (!sortColumn) return jobs;
   const dir = sortDir === 'desc' ? -1 : 1;
-  const statusOrder = { active: 0, unsaved: 1, error: 2, disabled: 3 };
+  const statusOrder = { active: 0, unsaved: 1, invalid: 2, disabled: 3, pendingRemoval: 4 };
   return [...jobs].sort((a, b) => {
     let av;
     let bv;
@@ -347,9 +408,20 @@ function sortedJobs(jobs) {
   });
 }
 
+function filteredPendingDeletes() {
+  const q = state.ui.search.trim().toLowerCase();
+  const statusFilter = state.ui.statusFilter || 'all';
+  if (statusFilter !== 'all' && statusFilter !== 'pending-removal') return [];
+  return state.pendingDeleteJobs.filter((job) => {
+    if (!q) return true;
+    return [job.name, job.command, job.schedule, job.id].some((v) => String(v).toLowerCase().includes(q));
+  });
+}
+
 function filteredJobs() {
   const q = state.ui.search.trim().toLowerCase();
   const statusFilter = state.ui.statusFilter || 'all';
+  if (statusFilter === 'pending-removal') return [];
   return sortedJobs(state.jobs.filter((job) => {
     if (statusFilter !== 'all' && jobStatusKey(job) !== statusFilter) return false;
     if (!q) return true;
@@ -357,16 +429,30 @@ function filteredJobs() {
   }));
 }
 
+function allVisibleJobs() {
+  return [...filteredPendingDeletes(), ...filteredJobs()];
+}
+
 function paginatedJobs() {
-  const jobs = filteredJobs();
+  const jobs = allVisibleJobs();
   const start = (state.ui.page - 1) * state.ui.pageSize;
   return jobs.slice(start, start + state.ui.pageSize);
 }
 
+function deployChangeParts() {
+  const parts = [];
+  const unsavedJobs = state.jobs.filter((job) => !job.saved).length;
+  const removals = state.pendingDeleteJobs.length;
+  const envEl = document.getElementById('env-vars');
+  const envDirty = envEl ? envEl.value !== state.envVars : false;
+  if (unsavedJobs) parts.push(`${unsavedJobs} edited job${unsavedJobs === 1 ? '' : 's'}`);
+  if (removals) parts.push(`${removals} removal${removals === 1 ? '' : 's'}`);
+  if (envDirty) parts.push('env vars');
+  return parts;
+}
+
 function hasUnsavedWork() {
-  const envDirty = document.getElementById('env-vars').value !== state.envVars;
-  const jobsUnsaved = state.jobs.some((job) => !job.saved);
-  return envDirty || jobsUnsaved;
+  return deployChangeParts().length > 0;
 }
 
 function paginationItems(current, total) {
@@ -454,16 +540,98 @@ function rowPrimaryActions(job) {
       ${iconAction('Edit', `App.openEditJob('${id}')`, ICONS.edit)}`;
 }
 
+function statusDotTitle(job) {
+  if (job.pendingRemoval) return 'Pending removal';
+  if (!job.enabled) return 'Disabled';
+  if (job.invalidSchedule) return 'Invalid schedule';
+  if (!job.saved) return 'Unsaved';
+  return 'Active';
+}
+
+function pendingRemovalActions(job) {
+  const id = escapeHtml(job.id).replace(/'/g, "\\'");
+  return `<button type="button" class="btn" data-variant="outline" data-size="sm" data-testid="undo-delete-btn" onclick="App.undoDeleteJob('${id}')">Undo</button>`;
+}
+
+function renderJobTableRow(job, rowNum) {
+  const scheduleTip = escapeHtml(job.human || describeSchedule(job.schedule));
+  const modifiedTip = escapeHtml(formatModified(job.modifiedAt));
+  const safeId = escapeHtml(job.id).replace(/'/g, "\\'");
+  const colW = `${state.ui.commandColWidth}%`;
+  const rowClass = job.pendingRemoval ? ' job-row--pending-removal' : '';
+
+  return `
+              <tr data-testid="job-row" data-job-id="${escapeHtml(job.id)}"${job.pendingRemoval ? ' data-pending-removal="true"' : ''} class="${rowClass.trim()}">
+                <td>
+                  ${job.pendingRemoval ? '' : `<input type="checkbox" class="row-select" aria-label="Select ${escapeHtml(job.name || job.id)}"
+                    ${isSelected(job.id) ? 'checked' : ''}
+                    onchange="App.toggleSelect('${safeId}', this.checked)" />`}
+                </td>
+                <td>${rowNum}</td>
+                <td>
+                  <div class="job-name">
+                    <span class="status-dot ${statusDot(job)}" title="${escapeHtml(statusDotTitle(job))}"></span>
+                    <span class="job-name-text">${escapeHtml(job.name || job.id)}</span>
+                  </div>
+                </td>
+                <td class="col-command" style="width:${colW}"><div class="job-command" title="${escapeHtml(job.command)}">${escapeHtml(job.command)}</div></td>
+                <td><code class="schedule-cell" title="${scheduleTip}">${escapeHtml(job.schedule)}</code></td>
+                <td>${statusBadge(job)}</td>
+                <td title="${modifiedTip}">${timeAgo(job.modifiedAt)}</td>
+                <td class="actions-cell">
+                  <div class="row-actions">
+                    ${job.pendingRemoval ? pendingRemovalActions(job) : rowPrimaryActions(job)}
+                    ${job.pendingRemoval ? '' : iconAction('More actions', `event.stopPropagation(); App.openRowMenu('${safeId}', this)`, ICONS.more, 'ghost')}
+                  </div>
+                </td>
+              </tr>`;
+}
+
+function renderJobCard(job) {
+  const scheduleTip = escapeHtml(job.human || describeSchedule(job.schedule));
+  const modifiedTip = escapeHtml(formatModified(job.modifiedAt));
+  const safeId = escapeHtml(job.id).replace(/'/g, "\\'");
+  const cardClass = job.pendingRemoval ? ' job-card--pending-removal' : '';
+
+  return `
+      <article class="job-card${cardClass}" data-testid="job-row" data-job-id="${escapeHtml(job.id)}"${job.pendingRemoval ? ' data-pending-removal="true"' : ''}>
+        <div class="job-card__select">
+          ${job.pendingRemoval ? '' : `<input type="checkbox" class="row-select" aria-label="Select ${escapeHtml(job.name || job.id)}"
+            ${isSelected(job.id) ? 'checked' : ''}
+            onchange="App.toggleSelect('${safeId}', this.checked)" />`}
+        </div>
+        <div class="job-card__body">
+          <div class="job-card__header">
+            <div class="job-name">
+              <span class="status-dot ${statusDot(job)}" title="${escapeHtml(statusDotTitle(job))}"></span>
+              <span class="job-name-text">${escapeHtml(job.name || job.id)}</span>
+            </div>
+            ${statusBadge(job)}
+          </div>
+          <code class="schedule-cell job-card__schedule" title="${scheduleTip}">${escapeHtml(job.schedule)}</code>
+          <div class="job-command job-card__command" title="${escapeHtml(job.command)}">${escapeHtml(job.command)}</div>
+          <div class="job-card__meta" title="${modifiedTip}">${timeAgo(job.modifiedAt)}</div>
+        </div>
+        <div class="job-card__actions">
+          <div class="row-actions">
+            ${job.pendingRemoval ? pendingRemovalActions(job) : `${rowPrimaryActions(job)}${iconAction('More actions', `event.stopPropagation(); App.openRowMenu('${safeId}', this)`, ICONS.more, 'ghost')}`}
+          </div>
+        </div>
+      </article>`;
+}
+
 function statusBadge(job) {
+  if (job.pendingRemoval) return '<span class="badge" data-variant="destructive">Pending removal</span>';
   if (!job.enabled) return '<span class="badge" data-variant="secondary">Disabled</span>';
-  if (job.hasError) return '<span class="badge" data-variant="destructive">Failed run</span>';
+  if (job.invalidSchedule) return '<span class="badge" data-variant="destructive">Invalid schedule</span>';
   if (!job.saved) return '<span class="badge" data-variant="outline">Unsaved</span>';
   return '<span class="badge">Active</span>';
 }
 
 function statusDot(job) {
+  if (job.pendingRemoval) return 'removal';
   if (!job.enabled) return 'off';
-  if (job.hasError) return 'error';
+  if (job.invalidSchedule) return 'invalid';
   if (!job.saved) return 'warn';
   return 'ok';
 }
@@ -501,7 +669,8 @@ function renderStatusFilter() {
     <option value="all">All (${counts.all})</option>
     <option value="active">Active (${counts.active})</option>
     <option value="unsaved">Unsaved (${counts.unsaved})</option>
-    <option value="error">Failed run (${counts.error})</option>
+    <option value="pending-removal">Pending removal (${counts.pendingRemoval})</option>
+    <option value="invalid">Invalid schedule (${counts.invalid})</option>
     <option value="disabled">Disabled (${counts.disabled})</option>`;
   select.value = current;
 }
@@ -530,26 +699,30 @@ function updateUnsavedIndicator() {
   const saveBtn = document.querySelector('[data-testid="save-crontab-btn"]');
   if (!cluster || !statusEl || !statusText || !saveBtn) return;
 
-  const { unsaved: unsavedJobs } = statusCounts();
-  const envEl = document.getElementById('env-vars');
-  const envDirty = envEl ? envEl.value !== state.envVars : false;
-  const pendingCount = unsavedJobs + (envDirty ? 1 : 0);
-  const hasUnsaved = pendingCount > 0;
+  const parts = deployChangeParts();
+  const changeCount = parts.length;
+  const hasChanges = changeCount > 0;
 
-  cluster.classList.toggle('is-dirty', hasUnsaved);
-  cluster.classList.toggle('is-clean', !hasUnsaved);
-  statusEl.hidden = !hasUnsaved;
+  cluster.classList.toggle('is-dirty', hasChanges);
+  cluster.classList.toggle('is-clean', !hasChanges);
+  statusEl.hidden = !hasChanges;
 
-  if (!hasUnsaved) {
+  if (!hasChanges) {
     statusText.textContent = '';
+    statusEl.title = '';
     saveBtn.dataset.variant = 'outline';
     saveBtn.title = 'Deploy env vars and enabled jobs to the system crontab';
     return;
   }
 
-  statusText.textContent = `${pendingCount} pending`;
+  const totalItems = (state.jobs.filter((job) => !job.saved).length)
+    + state.pendingDeleteJobs.length
+    + (document.getElementById('env-vars')?.value !== state.envVars ? 1 : 0);
+  const label = totalItems === 1 ? '1 change to deploy' : `${totalItems} changes to deploy`;
+  statusText.textContent = label;
+  statusEl.title = parts.join(' · ');
   saveBtn.dataset.variant = 'default';
-  saveBtn.title = 'Deploy pending changes to the system crontab';
+  saveBtn.title = `Deploy: ${parts.join(', ')}`;
   reinitComponents();
 }
 
@@ -636,7 +809,7 @@ function buildRowMenuItems(job) {
   }
   items.push(`<div role="menuitem" onclick="closeRowMenu(); App.duplicateJob('${id}')">Duplicate</div>`);
   items.push('<hr role="separator" />');
-  items.push(`<div role="menuitem" data-variant="destructive" onclick="closeRowMenu(); App.confirmDeleteJob('${id}')">Delete</div>`);
+  items.push(`<div role="menuitem" data-variant="destructive" onclick="closeRowMenu(); App.deleteJob('${id}')">Delete</div>`);
   return `<div role="group">${items.join('')}</div>`;
 }
 
@@ -648,9 +821,9 @@ function renderActionsMenu() {
   const menu = document.getElementById('actions-menu-list');
   menu.innerHTML = `
     <div role="group">
-      <div class="menu-label">System crontab</div>
-      ${actionMenuItem('Get from crontab', 'App.getFromCrontab()', TOOLTIPS.getFromCrontab)}
-      ${actionMenuItem('Preview crontab', 'App.openPreview()', TOOLTIPS.previewCrontab)}
+      <div class="menu-label">System</div>
+      ${actionMenuItem('Import from system', 'App.importFromSystem()', TOOLTIPS.importFromSystem)}
+      ${actionMenuItem('View system crontab', 'App.openSystemCrontab()', TOOLTIPS.viewSystemCrontab)}
       <hr role="separator" />
       <div class="menu-label">Backups</div>
       ${actionMenuItem('Create backup', 'App.createBackup()', TOOLTIPS.createBackup)}
@@ -663,26 +836,59 @@ function renderActionsMenu() {
   window.basecoat?.initAll?.({ force: true });
 }
 
+function isBackupSelected(id) {
+  return state.ui.backupSelectedIds.includes(id);
+}
+
+function updateBackupBulkBar() {
+  const bar = document.getElementById('backup-bulk-bar');
+  if (!bar) return;
+  const count = state.ui.backupSelectedIds.length;
+  if (count > 0) {
+    bar.classList.remove('hidden');
+    document.getElementById('backup-bulk-count').textContent = `${count} selected`;
+  } else {
+    bar.classList.add('hidden');
+  }
+}
+
 function renderBackupDialog() {
   const list = document.getElementById('backup-list');
   if (!state.backups.length) {
     list.innerHTML = '<div class="alert"><h2>No backups</h2><section>Create a backup to snapshot your current cron configuration.</section></div>';
+    updateBackupBulkBar();
     return;
   }
   list.innerHTML = state.backups.map((b) => {
     const id = escapeHtml(b.id).replace(/'/g, "\\'");
+    const safeName = escapeHtml(b.id);
     return `
-      <div class="backup-item">
+      <div class="backup-item" data-testid="backup-item" data-backup-id="${safeName}">
+        <label class="backup-select">
+          <input type="checkbox" class="backup-select-input" aria-label="Select backup ${safeName}"
+            ${isBackupSelected(b.id) ? 'checked' : ''}
+            onchange="App.toggleBackupSelect('${id}', this.checked)" />
+        </label>
         <div class="backup-meta">
-          <strong>${escapeHtml(b.name)}</strong>
+          <strong>${safeName}</strong>
           <span>${new Date(b.createdAt).toLocaleString()}</span>
         </div>
-        <div style="display:flex;gap:0.5rem">
+        <div class="backup-actions">
           <button type="button" class="btn" data-variant="outline" data-size="sm" onclick="App.openRestorePreview('${id}')">Restore</button>
-          <button type="button" class="btn" data-variant="destructive" data-size="sm" onclick="App.deleteBackup('${id}')">Delete</button>
+          <button type="button" class="btn" data-variant="destructive" data-size="sm" data-testid="backup-delete-btn" onclick="App.deleteBackup('${id}')">Delete</button>
         </div>
       </div>`;
   }).join('');
+  updateBackupBulkBar();
+}
+
+async function refreshBackups() {
+  const res = await apiGet('backups_list');
+  const names = await res.json();
+  state.backups = mapBackups(names);
+  state.ui.backupSelectedIds = state.ui.backupSelectedIds.filter((id) => names.includes(id));
+  saveUiState();
+  renderBackupDialog();
 }
 
 function openConfirm(title, desc, bodyHtml, onConfirm, destructive) {
@@ -704,13 +910,13 @@ function renderJobs() {
 
   const container = document.getElementById('jobs-container');
   const jobs = paginatedJobs();
-  const total = filteredJobs().length;
+  const total = allVisibleJobs().length;
   const totalPages = Math.max(1, Math.ceil(total / state.ui.pageSize));
   const colW = `${state.ui.commandColWidth}%`;
 
   if (state.ui.page > totalPages) state.ui.page = totalPages;
 
-  if (state.jobs.length === 0) {
+  if (state.jobs.length === 0 && state.pendingDeleteJobs.length === 0) {
     container.innerHTML = `
       <div class="empty-state" data-testid="empty-state">
         <h2>No cron jobs yet</h2>
@@ -730,58 +936,33 @@ function renderJobs() {
     const somePageSelected = pageIds.some((id) => isSelected(id)) && !allPageSelected;
 
     container.innerHTML = `
-      <div class="table-scroll">
-      <table class="table" data-testid="jobs-table">
-        <thead>
-          <tr>
-            <th style="width:2.5rem">
-              <input type="checkbox" class="row-select" aria-label="Select all on page"
-                ${allPageSelected ? 'checked' : ''}
-                onclick="App.toggleSelectAll(this.checked)" />
-            </th>
-            <th style="width:2.5rem">#</th>
-            <th>${sortHeaderLabel('Name', 'name')}</th>
-            <th class="col-command col-resize-handle" id="command-col-handle" style="width:${colW}">${sortHeaderLabel('Command', 'command')}</th>
-            <th>${sortHeaderLabel('Schedule', 'schedule')}</th>
-            <th>${sortHeaderLabel('Status', 'status')}</th>
-            <th>${sortHeaderLabel('Modified', 'modified')}</th>
-            <th style="width:10rem">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${jobs.map((job, i) => {
-    const rowNum = (state.ui.page - 1) * state.ui.pageSize + i + 1;
-    const scheduleTip = escapeHtml(job.human || describeSchedule(job.schedule));
-    const modifiedTip = escapeHtml(formatModified(job.modifiedAt));
-    const safeId = escapeHtml(job.id).replace(/'/g, "\\'");
-    return `
-              <tr data-testid="job-row" data-job-id="${escapeHtml(job.id)}">
-                <td>
-                  <input type="checkbox" class="row-select" aria-label="Select ${escapeHtml(job.name || job.id)}"
-                    ${isSelected(job.id) ? 'checked' : ''}
-                    onchange="App.toggleSelect('${safeId}', this.checked)" />
-                </td>
-                <td>${rowNum}</td>
-                <td>
-                  <div class="job-name">
-                    <span class="status-dot ${statusDot(job)}" title="Status"></span>
-                    <span class="job-name-text">${escapeHtml(job.name || job.id)}</span>
-                  </div>
-                </td>
-                <td class="col-command" style="width:${colW}"><div class="job-command" title="${escapeHtml(job.command)}">${escapeHtml(job.command)}</div></td>
-                <td><code class="schedule-cell" title="${scheduleTip}">${escapeHtml(job.schedule)}</code></td>
-                <td>${statusBadge(job)}</td>
-                <td title="${modifiedTip}">${timeAgo(job.modifiedAt)}</td>
-                <td class="actions-cell">
-                  <div class="row-actions">
-                    ${rowPrimaryActions(job)}
-                    ${iconAction('More actions', `event.stopPropagation(); App.openRowMenu('${safeId}', this)`, ICONS.more, 'ghost')}
-                  </div>
-                </td>
-              </tr>`;
-  }).join('')}
-        </tbody>
-      </table>
+      <div class="jobs-table-view">
+        <div class="table-scroll">
+          <table class="table" data-testid="jobs-table">
+            <thead>
+              <tr>
+                <th style="width:2.5rem">
+                  <input type="checkbox" class="row-select" aria-label="Select all on page"
+                    ${allPageSelected ? 'checked' : ''}
+                    onclick="App.toggleSelectAll(this.checked)" />
+                </th>
+                <th style="width:2.5rem">#</th>
+                <th>${sortHeaderLabel('Name', 'name')}</th>
+                <th class="col-command col-resize-handle" id="command-col-handle" style="width:${colW}">${sortHeaderLabel('Command', 'command')}</th>
+                <th>${sortHeaderLabel('Schedule', 'schedule')}</th>
+                <th>${sortHeaderLabel('Status', 'status')}</th>
+                <th>${sortHeaderLabel('Modified', 'modified')}</th>
+                <th style="width:10rem">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${jobs.map((job, i) => renderJobTableRow(job, (state.ui.page - 1) * state.ui.pageSize + i + 1)).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="jobs-card-view" data-testid="jobs-cards">
+        ${jobs.map((job) => renderJobCard(job)).join('')}
       </div>`;
 
     const selectAll = container.querySelector('thead input[type="checkbox"]');
@@ -997,25 +1178,17 @@ const App = {
     }
   },
 
-  bulkDelete() {
+  async bulkDelete() {
     const ids = [...state.ui.selectedIds];
     if (!ids.length) return;
-    openConfirm(
-      'Delete selected jobs',
-      `Permanently remove ${ids.length} selected job${ids.length === 1 ? '' : 's'}?`,
-      '',
-      async () => {
-        try {
-          for (const id of ids) {
-            await apiPost('remove', { _id: id });
-          }
-          reloadPage();
-        } catch (err) {
-          toast('error', 'Bulk delete failed', err.message);
-        }
-      },
-      true
-    );
+    try {
+      for (const id of ids) {
+        await apiPost('remove', { _id: id });
+      }
+      reloadPage();
+    } catch (err) {
+      toast('error', 'Bulk delete failed', err.message);
+    }
   },
 
   confirmRunJob(id) {
@@ -1158,16 +1331,22 @@ const App = {
     }
   },
 
-  confirmDeleteJob(id) {
-    const job = state.jobs.find((j) => j.id === id);
-    openConfirm('Delete job', `This will permanently remove "${job?.name || id}".`, '', async () => {
-      try {
-        await apiPost('remove', { _id: id });
-        reloadPage();
-      } catch (err) {
-        toast('error', 'Delete failed', err.message);
-      }
-    }, true);
+  async deleteJob(id) {
+    try {
+      await apiPost('remove', { _id: id });
+      reloadPage();
+    } catch (err) {
+      toast('error', 'Delete failed', err.message);
+    }
+  },
+
+  async undoDeleteJob(id) {
+    try {
+      await apiPost('undelete', { _id: id });
+      reloadPage();
+    } catch (err) {
+      toast('error', 'Undo failed', err.message);
+    }
   },
 
   async runJob(id) {
@@ -1206,31 +1385,58 @@ const App = {
     });
   },
 
-  createBackup() {
-    openConfirm('Create backup', 'Copy the current jobs database to a dated backup file?', '', async () => {
-      try {
-        await apiGet('backup');
-        reloadPage();
-      } catch (err) {
-        toast('error', 'Backup failed', err.message);
-      }
-    });
+  async createBackup() {
+    try {
+      await apiGet('backup');
+      reloadPage();
+    } catch (err) {
+      toast('error', 'Backup failed', err.message);
+    }
   },
 
   openBackupDialog() {
+    state.ui.backupSelectedIds = [];
+    saveUiState();
     renderBackupDialog();
     document.getElementById('backup-dialog').showModal();
   },
 
-  deleteBackup(id) {
-    openConfirm('Delete backup', `Delete backup "${id}"?`, '', async () => {
-      try {
-        await apiGet('delete_backup', { db: id });
-        reloadPage();
-      } catch (err) {
-        toast('error', 'Delete backup failed', err.message);
-      }
-    }, true);
+  toggleBackupSelect(id, checked) {
+    if (checked) {
+      if (!state.ui.backupSelectedIds.includes(id)) state.ui.backupSelectedIds.push(id);
+    } else {
+      state.ui.backupSelectedIds = state.ui.backupSelectedIds.filter((x) => x !== id);
+    }
+    saveUiState();
+    updateBackupBulkBar();
+  },
+
+  clearBackupSelection() {
+    state.ui.backupSelectedIds = [];
+    saveUiState();
+    renderBackupDialog();
+  },
+
+  async bulkDeleteBackups() {
+    const ids = [...state.ui.backupSelectedIds];
+    if (!ids.length) return;
+    try {
+      await apiPost('delete_backups', { dbs: ids });
+      await refreshBackups();
+      toast('success', 'Backups deleted', `${ids.length} backup file${ids.length === 1 ? '' : 's'} removed.`);
+    } catch (err) {
+      toast('error', 'Delete backups failed', err.message);
+    }
+  },
+
+  async deleteBackup(id) {
+    try {
+      await apiGet('delete_backup', { db: id });
+      await refreshBackups();
+      toast('success', 'Backup deleted', 'Backup file removed.');
+    } catch (err) {
+      toast('error', 'Delete backup failed', err.message);
+    }
   },
 
   async openRestorePreview(id) {
@@ -1265,11 +1471,11 @@ const App = {
     window.location.href = routeUrl('export');
   },
 
-  getFromCrontab() {
+  importFromSystem() {
     openConfirm(
-      'Get from crontab',
+      'Import from system',
       'Import jobs from the system crontab?',
-      '<p>A backup will be created automatically before importing.</p>',
+      '<p>Pulls external crontab lines into the app. Lines deployed by Cron GUI are skipped automatically. A backup is created first.</p>',
       async () => {
         try {
           await apiGet('import_crontab');
@@ -1279,6 +1485,23 @@ const App = {
         }
       }
     );
+  },
+
+  async openSystemCrontab() {
+    try {
+      const res = await apiGet('system_crontab');
+      const text = await res.text();
+      document.getElementById('system-crontab-content').textContent = text || '# (no crontab for this user)\n';
+      document.getElementById('system-crontab-dialog').showModal();
+    } catch (err) {
+      toast('error', 'Failed to load system crontab', err.message);
+    }
+  },
+
+  copySystemCrontab() {
+    navigator.clipboard.writeText(document.getElementById('system-crontab-content').textContent).then(() => {
+      toast('success', 'Copied', 'System crontab copied to clipboard.');
+    });
   },
 
   async saveToCrontab() {
@@ -1305,7 +1528,7 @@ const App = {
 
   copyPreview() {
     navigator.clipboard.writeText(document.getElementById('preview-content').textContent).then(() => {
-      toast('success', 'Copied', 'Crontab preview copied to clipboard.');
+      toast('success', 'Copied', 'Deploy preview copied to clipboard.');
     });
   },
 };
@@ -1316,4 +1539,5 @@ window.closeRowMenu = closeRowMenu;
 document.addEventListener('DOMContentLoaded', () => {
   App.init();
   window.basecoat?.initAll?.();
+  initToasterLayer();
 });

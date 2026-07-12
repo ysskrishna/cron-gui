@@ -47,6 +47,7 @@
     <div class="list-toolbar">
       <div class="list-toolbar-actions">
         <button type="button" class="btn" data-size="sm" data-testid="new-job-btn" title="Add a new scheduled job" onclick="App.openNewJob()">New job</button>
+        <button type="button" class="btn" data-variant="outline" data-size="sm" data-testid="preview-deploy-btn" title="Preview the crontab text that Save to crontab will write" onclick="App.openPreview()">Preview</button>
         <div id="deploy-cluster" class="deploy-cluster is-clean" data-testid="deploy-cluster">
           <span id="unsaved-indicator" class="deploy-cluster__status" data-testid="unsaved-indicator" aria-live="polite" hidden>
             <span class="deploy-cluster__dot" aria-hidden="true"></span>
@@ -68,7 +69,7 @@
           <option value="all">All</option>
           <option value="active">Active</option>
           <option value="unsaved">Unsaved</option>
-          <option value="error">Failed run</option>
+          <option value="invalid">Invalid schedule</option>
           <option value="disabled">Disabled</option>
         </select>
         <button type="button" id="clear-filters-btn" class="btn hidden" data-variant="outline" data-size="sm" title="Clear search and status filter" onclick="App.clearFilters()">Clear filters</button>
@@ -224,19 +225,39 @@
   <dialog id="preview-dialog" class="dialog" aria-labelledby="preview-title" onclick="if (event.target === this) this.close()">
     <div>
       <header>
-        <h2 id="preview-title">Crontab preview</h2>
+        <h2 id="preview-title">Deploy preview</h2>
         <p>Preview of what will be deployed to the system crontab.</p>
       </header>
       <section>
         <div id="preview-unsaved-alert" class="alert hidden" style="margin-bottom:1rem">
-          <h2>Unsaved changes</h2>
-          <section>This preview may differ from the active crontab if you have unsaved changes.</section>
+          <h2>Changes not deployed</h2>
+          <section>This preview reflects pending edits. Deploy to apply them to the system crontab.</section>
         </div>
         <pre id="preview-content" class="preview-output"></pre>
       </section>
       <footer>
         <button type="button" class="btn" data-variant="outline" onclick="App.copyPreview()">Copy</button>
         <button type="button" class="btn" onclick="document.getElementById('preview-dialog').close()">Close</button>
+      </footer>
+      <button type="button" class="btn" data-variant="ghost" data-size="icon-sm" aria-label="Close" onclick="this.closest('dialog').close()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+  </dialog>
+
+  <!-- System crontab dialog (read-only) -->
+  <dialog id="system-crontab-dialog" class="dialog" aria-labelledby="system-crontab-title" onclick="if (event.target === this) this.close()">
+    <div>
+      <header>
+        <h2 id="system-crontab-title">System crontab</h2>
+        <p>Read-only view of the active system crontab (crontab -l).</p>
+      </header>
+      <section>
+        <pre id="system-crontab-content" class="preview-output" data-testid="system-crontab-content"></pre>
+      </section>
+      <footer>
+        <button type="button" class="btn" data-variant="outline" onclick="App.copySystemCrontab()">Copy</button>
+        <button type="button" class="btn" onclick="document.getElementById('system-crontab-dialog').close()">Close</button>
       </footer>
       <button type="button" class="btn" data-variant="ghost" data-size="icon-sm" aria-label="Close" onclick="this.closest('dialog').close()">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
@@ -270,6 +291,11 @@
         <p>Restore or delete saved snapshots of your cron configuration.</p>
       </header>
       <section>
+        <div id="backup-bulk-bar" class="backup-bulk-bar hidden">
+          <span id="backup-bulk-count">0 selected</span>
+          <button type="button" class="btn" data-variant="destructive" data-size="sm" data-testid="backup-bulk-delete-btn" onclick="App.bulkDeleteBackups()">Delete selected</button>
+          <button type="button" class="btn" data-variant="ghost" data-size="sm" onclick="App.clearBackupSelection()">Clear selection</button>
+        </div>
         <div id="backup-list" class="backup-list"></div>
       </section>
       <footer>
@@ -319,7 +345,9 @@
       routes: <%- routes %>,
       crontabs: <%- crontabs %>,
       backups: <%- JSON.stringify(backups) %>,
-      env: <%- JSON.stringify(env) %>
+      env: <%- JSON.stringify(env) %>,
+      pendingDeletes: <%- pendingDeletes %>,
+      pendingDeleteJobs: <%- pendingDeleteJobs %>
     };
   </script>
   <script src="js/app.js"></script>

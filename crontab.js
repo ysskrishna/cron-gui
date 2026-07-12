@@ -109,6 +109,86 @@ function addEnvVars(envVars, command) {
   return command;
 }
 
+const DEPLOY_MARKER_RE = /#\s*cron-gui:id=([^\s#]+)/;
+
+function deployMarker(jobId) {
+  return `# cron-gui:id=${jobId}`;
+}
+
+function parseCrontabLine(line) {
+  let markerId = null;
+  const markerMatch = line.match(DEPLOY_MARKER_RE);
+  if (markerMatch) {
+    markerId = markerMatch[1];
+    line = line.replace(DEPLOY_MARKER_RE, '').trim();
+  }
+
+  line = line.replace(/\t+/g, ' ');
+  if (!line || line.startsWith('#')) {
+    return { schedule: '', command: '', markerId };
+  }
+
+  const regex = /^((@[a-zA-Z]+\s+)|(([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+))/;
+  const command = line.replace(regex, '').trim();
+  const schedule = line.replace(command, '').trim();
+  return { schedule, command, markerId };
+}
+
+function unwrapCronGuiCommand(command) {
+  const match = command.match(/^\(+{\s*([\s\S]+?)\s*;\s*}\s*\|\s*tee\s+/);
+  return match ? match[1].trim() : null;
+}
+
+function formatCrontabJobLine(tab) {
+  return `${tab.schedule} ${makeCommand(tab)} ${deployMarker(tab._id)}`;
+}
+
+function isValidSchedule(schedule) {
+  try {
+    return CronExpressionParser.parse(schedule) !== null;
+  } catch (_e) {
+    return false;
+  }
+}
+
+function importMarkedJob(markerId, schedule, wrappedCommand) {
+  db.findOne({ _id: markerId }, (err, doc) => {
+    if (err || doc) return;
+    const bareCommand = unwrapCronGuiCommand(wrappedCommand) || wrappedCommand;
+    const tab = buildCrontab(markerId, bareCommand, schedule, false, 'false', {});
+    tab._id = markerId;
+    tab.created = Date.now();
+    tab.saved = false;
+    tab.everDeployed = true;
+    db.insert(tab);
+  });
+}
+
+function importExternalJob(name, command, schedule) {
+  db.findOne({ command, schedule }, (err, doc) => {
+    if (err) throw err;
+    if (!doc) {
+      exports.create_new(name, command, schedule, 'false');
+      return;
+    }
+    doc.command = command;
+    doc.schedule = schedule;
+    exports.update(doc);
+  });
+}
+
+function processImportLine(line, namePrefix, index) {
+  const { schedule, command, markerId } = parseCrontabLine(line);
+  if (!command || !schedule || !isValidSchedule(schedule)) return;
+
+  if (markerId) {
+    importMarkedJob(markerId, schedule, command);
+    return;
+  }
+
+  importExternalJob(`${namePrefix}_${index}`, command, schedule);
+}
+
 exports.db_folder = dbFolder;
 exports.log_folder = logFolder;
 exports.env_file = envFile;
@@ -131,46 +211,72 @@ exports.status = (_id, stopped) => {
   db.update({ _id }, { $set: { stopped, saved: false } });
 };
 
+function wasDeployedToCrontab(doc) {
+  return !!(doc.everDeployed || doc.saved) && !doc.stopped;
+}
+
 exports.remove = (_id) => {
-  db.remove({ _id }, {});
+  db.findOne({ _id }, (err, doc) => {
+    if (err || !doc) return;
+    if (wasDeployedToCrontab(doc)) {
+      db.update({ _id }, { $set: { deleted: true, saved: false } }, {});
+      return;
+    }
+    db.remove({ _id }, {});
+  });
 };
 
-const LOG_TIMESTAMP_RE = /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}/;
-
-function logHasErrorContent(logFile) {
-  try {
-    const lines = fs.readFileSync(logFile, 'utf8').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-    return lines.some((line) => !LOG_TIMESTAMP_RE.test(line));
-  } catch {
-    return false;
+function enrichDocSchedule(doc) {
+  if (doc.schedule === '@reboot') {
+    doc.next = 'Next Reboot';
+  } else {
+    try {
+      doc.human = cronstrue.toString(doc.schedule, { locale: humanCronLocale });
+      doc.next = CronExpressionParser.parse(doc.schedule).next().toString();
+    } catch (e) {
+      console.error(e);
+      doc.next = 'invalid';
+    }
   }
+  return doc;
 }
 
-function jobHasStderrLog(id) {
-  return logHasErrorContent(path.join(logFolder, `${id}.log`));
-}
+exports.pendingDeletes = (callback) => {
+  db.count({ deleted: true }, (err, count) => {
+    if (err) {
+      console.error(err);
+      callback(0);
+      return;
+    }
+    callback(count || 0);
+  });
+};
 
-exports.crontabs = (callback) => {
-  db.find({}).sort({ created: -1 }).exec((err, docs) => {
+exports.pending_delete_jobs = (callback) => {
+  db.find({ deleted: true }).sort({ created: -1 }).exec((err, docs) => {
     if (err) {
       console.error(err);
       return callback([]);
     }
-    for (const doc of docs) {
-      doc.hasError = doc.logging === 'true' && jobHasStderrLog(doc._id);
-      if (doc.schedule === '@reboot') {
-        doc.next = 'Next Reboot';
-      } else {
-        try {
-          doc.human = cronstrue.toString(doc.schedule, { locale: humanCronLocale });
-          doc.next = CronExpressionParser.parse(doc.schedule).next().toString();
-        } catch (e) {
-          console.error(e);
-          doc.next = 'invalid';
-        }
-      }
+    callback(docs.map(enrichDocSchedule));
+  });
+};
+
+exports.undelete = (_id) => {
+  db.findOne({ _id }, (err, doc) => {
+    if (err || !doc || !doc.deleted) return;
+    const saved = !!(doc.everDeployed || doc.saved);
+    db.update({ _id }, { $unset: { deleted: '' }, $set: { saved } }, {});
+  });
+};
+
+exports.crontabs = (callback) => {
+  db.find({ deleted: { $ne: true } }).sort({ created: -1 }).exec((err, docs) => {
+    if (err) {
+      console.error(err);
+      return callback([]);
     }
-    callback(docs);
+    callback(docs.map(enrichDocSchedule));
   });
 };
 
@@ -207,7 +313,7 @@ exports.set_crontab = (envVars, callback) => {
     }
     for (const tab of tabs) {
       if (!tab.stopped) {
-        crontabString += `${tab.schedule} ${makeCommand(tab)}\n`;
+        crontabString += `${formatCrontabJobLine(tab)}\n`;
       }
     }
 
@@ -227,8 +333,10 @@ exports.set_crontab = (envVars, callback) => {
             console.error(err);
             return callback(err);
           }
-          db.update({}, { $set: { saved: true } }, { multi: true });
-          callback();
+          db.remove({ deleted: true }, { multi: true }, () => {
+            db.update({ deleted: { $ne: true } }, { $set: { saved: true, everDeployed: true } }, { multi: true });
+            callback();
+          });
         });
       });
     });
@@ -278,33 +386,12 @@ exports.get_env = () => {
 
 exports.import_crontab = () => {
   exec('crontab -l', (error, stdout) => {
-    const lines = stdout.split('\n');
+    if (error && !stdout) return;
+    const lines = (stdout || '').split('\n');
     const namePrefix = Date.now();
 
     lines.forEach((line, index) => {
-      line = line.replace(/\t+/g, ' ');
-      const regex = /^((@[a-zA-Z]+\s+)|(([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+))/;
-      const command = line.replace(regex, '').trim();
-      const schedule = line.replace(command, '').trim();
-
-      let isValid = false;
-      try {
-        isValid = CronExpressionParser.parse(schedule) !== null;
-      } catch (_e) { /* ignore */ }
-
-      if (command && schedule && isValid) {
-        const name = `${namePrefix}_${index}`;
-        db.findOne({ command, schedule }, (err, doc) => {
-          if (err) throw err;
-          if (!doc) {
-            exports.create_new(name, command, schedule, null);
-          } else {
-            doc.command = command;
-            doc.schedule = schedule;
-            exports.update(doc);
-          }
-        });
-      }
+      processImportLine(line, namePrefix, index);
     });
   });
 };
@@ -317,12 +404,27 @@ exports.preview_crontab = (envVars, callback) => {
     }
     for (const tab of tabs) {
       if (!tab.stopped) {
-        crontabString += `${tab.schedule} ${makeCommand(tab)}\n`;
+        crontabString += `${formatCrontabJobLine(tab)}\n`;
       }
     }
     callback(crontabString);
   });
 };
+
+exports.system_crontab = (callback) => {
+  exec('crontab -l', (error, stdout) => {
+    if (error && !stdout) {
+      callback(error, '');
+      return;
+    }
+    callback(null, stdout || '');
+  });
+};
+
+exports.parseCrontabLine = parseCrontabLine;
+exports.unwrapCronGuiCommand = unwrapCronGuiCommand;
+exports.formatCrontabJobLine = formatCrontabJobLine;
+exports.processImportLine = processImportLine;
 
 exports.autosave_crontab = (callback) => {
   const envVars = exports.get_env();

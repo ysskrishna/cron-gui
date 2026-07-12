@@ -77,12 +77,16 @@ app.set('port', process.env.PORT || 8000);
 app.get(routes.root, (req, res) => {
   crontab.reload_db();
   crontab.crontabs((docs) => {
-    res.render('index', {
-      routes: JSON.stringify(routesRelative),
-      crontabs: JSON.stringify(docs),
-      backups: crontab.get_backup_names(),
-      env: crontab.get_env(),
-      dayjs,
+    crontab.pending_delete_jobs((pendingDeleteJobs) => {
+      res.render('index', {
+        routes: JSON.stringify(routesRelative),
+        crontabs: JSON.stringify(docs),
+        backups: crontab.get_backup_names(),
+        env: crontab.get_env(),
+        pendingDeletes: pendingDeleteJobs.length,
+        pendingDeleteJobs: JSON.stringify(pendingDeleteJobs),
+        dayjs,
+      });
     });
   });
 });
@@ -111,6 +115,11 @@ app.post(routes.start, (req, res) => {
 
 app.post(routes.remove, (req, res) => {
   crontab.remove(req.body._id);
+  res.end();
+});
+
+app.post(routes.undelete, (req, res) => {
+  crontab.undelete(req.body._id);
   res.end();
 });
 
@@ -192,6 +201,31 @@ app.get(routes.preview_crontab, (req, res) => {
   crontab.preview_crontab(envVars, (result) => {
     res.type('text/plain').send(result);
   });
+});
+
+app.get(routes.system_crontab, (req, res) => {
+  crontab.system_crontab((err, result) => {
+    if (err) {
+      res.type('text/plain').send('# (no crontab for this user)\n');
+      return;
+    }
+    res.type('text/plain').send(result);
+  });
+});
+
+app.get(routes.backups_list, (req, res) => {
+  res.json(crontab.get_backup_names());
+});
+
+app.post(routes.delete_backups, (req, res) => {
+  const dbs = Array.isArray(req.body.dbs) ? req.body.dbs : [];
+  for (const dbName of dbs) {
+    const sanitized = path.basename(String(dbName));
+    if (sanitized.startsWith('backup')) {
+      restore.delete(sanitized);
+    }
+  }
+  res.end();
 });
 
 function sendLog(filePath, emptyMessage, res) {
