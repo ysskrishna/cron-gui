@@ -174,9 +174,16 @@ function describeSchedule(schedule) {
 }
 
 function applyTheme(theme) {
-  document.documentElement.classList.toggle('dark', theme === 'dark');
-  document.getElementById('theme-icon-sun').classList.toggle('hidden', theme === 'dark');
-  document.getElementById('theme-icon-moon').classList.toggle('hidden', theme !== 'dark');
+  const isDark = theme === 'dark';
+  document.documentElement.classList.toggle('dark', isDark);
+  document.getElementById('theme-icon-sun').classList.toggle('hidden', isDark);
+  document.getElementById('theme-icon-moon').classList.toggle('hidden', !isDark);
+
+  const favicon = document.getElementById('favicon');
+  if (favicon) favicon.href = isDark ? 'img/favicon-32-dark.png' : 'img/favicon-32-light.png';
+
+  const appleIcon = document.getElementById('apple-touch-icon');
+  if (appleIcon) appleIcon.href = isDark ? 'img/apple-touch-icon-dark.png' : 'img/apple-touch-icon-light.png';
 }
 
 function formatModified(ts) {

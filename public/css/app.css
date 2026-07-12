@@ -40,9 +40,26 @@
       justify-content: center;
       width: 2rem;
       height: 2rem;
+      flex-shrink: 0;
+    }
+
+    .brand-icon img {
+      width: 2rem;
+      height: 2rem;
       border-radius: 0.5rem;
-      background: var(--foreground);
-      color: var(--background);
+      object-fit: contain;
+    }
+
+    .brand-icon .logo-dark {
+      display: none;
+    }
+
+    .dark .brand-icon .logo-light {
+      display: none;
+    }
+
+    .dark .brand-icon .logo-dark {
+      display: block;
     }
 
     .topbar-actions {

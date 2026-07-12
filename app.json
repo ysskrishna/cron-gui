@@ -2,6 +2,6 @@
   "name": "cron-gui",
   "description": "Modern web UI for managing crontab jobs",
   "repository": "https://github.com/ysskrishna/cron-gui",
-  "logo": "https://github.com/ysskrishna.png",
+  "logo": "https://raw.githubusercontent.com/ysskrishna/cron-gui/main/public/img/icon-512-dark.png",
   "keywords": ["cron", "crontab", "node"]
 }

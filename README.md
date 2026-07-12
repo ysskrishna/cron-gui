@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="public/img/icon-512-dark.png" alt="Cron GUI" width="96" height="96" />
+</p>
+
 Cron GUI
 ========
 
