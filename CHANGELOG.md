@@ -5,6 +5,21 @@ All notable changes to `cron-gui` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).  
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2026-07-12
+
+Simplify release CI and switch npm publishing to trusted publishing.
+
+### Changed
+
+- **Publish npm** workflow: use npm trusted publishing (OIDC) instead of `NPM_TOKEN`
+- **Publish npm** and **Publish Docker** workflows: remove prerelease handling; all releases publish as stable
+- **Create Release** workflow: all GitHub Releases are full releases
+- **validate-release** action: tags must match `vMAJOR.MINOR.PATCH` exactly
+- **README**: remove ClawHub footer link
+- **AGENTS.md**: remove prerelease guidance
+
+[0.1.4]: https://github.com/ysskrishna/cron-gui/releases/tag/v0.1.4
+
 ## [0.1.3] - 2026-07-12
 
 Fix manual republish workflows ignoring the entered release tag.
