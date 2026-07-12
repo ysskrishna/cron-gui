@@ -19,7 +19,7 @@ on:
         default: false
 
 concurrency:
-  group: publish-npm-${{ github.event.release.tag_name || github.ref_name || github.event.inputs.tag }}
+  group: publish-npm-${{ github.event.inputs.tag || github.event.release.tag_name || github.ref_name }}
   cancel-in-progress: false
 
 permissions:
@@ -27,7 +27,7 @@ permissions:
   id-token: write
 
 env:
-  RELEASE_TAG: ${{ github.event.release.tag_name || github.ref_name || github.event.inputs.tag }}
+  RELEASE_TAG: ${{ github.event.inputs.tag || github.event.release.tag_name || github.ref_name }}
   IS_PRERELEASE: ${{ (github.event_name == 'release' && github.event.release.prerelease) || (github.event_name == 'workflow_dispatch' && github.event.inputs.prerelease) || (github.event_name == 'push' && contains(github.ref_name, '-')) }}
 
 jobs:
