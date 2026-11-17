@@ -14,6 +14,8 @@
   <a href="https://hub.docker.com/r/ysskrishna/cron-gui"><img src="https://img.shields.io/docker/pulls/ysskrishna/cron-gui.svg?style=flat-square" alt="Docker Pulls" /></a>
   <a href="https://nodejs.org/"><img src="https://img.shields.io/node/v/cron-gui.svg?style=flat-square" alt="Node" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/ysskrishna/cron-gui.svg?style=flat-square" alt="License: MIT" /></a>
+  <a href="https://www.npmjs.com/package/cron-gui"><img src="https://img.shields.io/npm/dm/cron-gui?style=flat-square" alt="npm downloads" /></a>
+  <a href="https://ysskrishna.space"><img src="https://img.shields.io/badge/author-ysskrishna.space-informational?style=flat-square" alt="Author site" /></a>
   <a href="https://context7.com/ysskrishna/cron-gui"><img src="https://img.shields.io/badge/Context7-docs-18181B?style=flat-square" alt="Context7" /></a>
   <a href="https://deepwiki.com/ysskrishna/cron-gui"><img src="https://img.shields.io/badge/DeepWiki-ask-18181B?style=flat-square" alt="Ask DeepWiki" /></a>
 </p>
@@ -54,7 +56,10 @@ cron-gui --reset
 
 ## See it in action
 
-### Job dashboard
+<a id="job-dashboard"></a>
+
+<details>
+<summary><b>Job dashboard</b></summary>
 
 Sortable table with live status, next-run hints, and unsaved-change indicators — so you always know what is scheduled and what still needs deploying.
 
@@ -62,7 +67,12 @@ Sortable table with live status, next-run hints, and unsaved-change indicators �
   <img src="docs/screenshots/dashboard.png" alt="Cron GUI job dashboard with search, filters, and status badges" width="900" />
 </p>
 
-### Create and edit jobs
+</details>
+
+<a id="create-and-edit-jobs"></a>
+
+<details>
+<summary><b>Create and edit jobs</b></summary>
 
 Schedule presets, cron expressions, logging, and optional email notifications — all in a focused dialog.
 
@@ -74,7 +84,12 @@ Schedule presets, cron expressions, logging, and optional email notifications �
   <img src="docs/screenshots/edit-job.png" alt="Edit job dialog with logging and mail options" width="800" />
 </p>
 
-### Preview before you deploy
+</details>
+
+<a id="preview-before-you-deploy"></a>
+
+<details>
+<summary><b>Preview before you deploy</b></summary>
 
 See the exact crontab text — environment variables plus one line per enabled job — before writing to the system crontab.
 
@@ -82,7 +97,12 @@ See the exact crontab text — environment variables plus one line per enabled j
   <img src="docs/screenshots/preview.png" alt="Crontab preview modal showing env vars and job lines" width="800" />
 </p>
 
-### Crontab environment
+</details>
+
+<a id="crontab-environment"></a>
+
+<details>
+<summary><b>Crontab environment</b></summary>
 
 Set `PATH`, `MAILTO`, and other variables once — applied to every deployed job.
 
@@ -90,7 +110,12 @@ Set `PATH`, `MAILTO`, and other variables once — applied to every deployed job
   <img src="docs/screenshots/settings.png" alt="Crontab environment settings drawer" width="800" />
 </p>
 
-### Per-job logs
+</details>
+
+<a id="per-job-logs"></a>
+
+<details>
+<summary><b>Per-job logs</b></summary>
 
 View stdout and stderr history for any job without leaving the page.
 
@@ -98,7 +123,12 @@ View stdout and stderr history for any job without leaving the page.
   <img src="docs/screenshots/logs.gif" alt="Opening per-job stdout logs" width="900" />
 </p>
 
-### Backups and portability
+</details>
+
+<a id="backups-and-portability"></a>
+
+<details>
+<summary><b>Backups and portability</b></summary>
 
 Server-side snapshots, database import/export, and system crontab sync — grouped under **Actions**.
 
@@ -110,7 +140,12 @@ Server-side snapshots, database import/export, and system crontab sync — group
   <img src="docs/screenshots/backups.png" alt="Manage backups modal with restore and delete" width="800" />
 </p>
 
-### Search, filters, and dark mode
+</details>
+
+<a id="search-filters-and-dark-mode"></a>
+
+<details>
+<summary><b>Search, filters, and dark mode</b></summary>
 
 Find jobs instantly, filter by status, and switch themes to match your environment.
 
@@ -121,6 +156,8 @@ Find jobs instantly, filter by status, and switch themes to match your environme
 <p align="center">
   <img src="docs/screenshots/dashboard-dark.png" alt="Cron GUI in dark mode" width="800" />
 </p>
+
+</details>
 
 ## Configuration
 
@@ -168,18 +205,30 @@ See [docs/docker.md](docs/docker.md) for volumes, auth, and production notes.
 - [Release history (CHANGELOG)](CHANGELOG.md)
 - [Upstream crontab-ui docs](https://github.com/alseambusher/crontab-ui)
 
+## Credits
+
+Forked from [crontab-ui](https://www.npmjs.com/package/crontab-ui) by [alseambusher](https://github.com/alseambusher).
+
+## Built and maintained by
+
+Cron GUI is built and maintained by:
+
+| | Name | GitHub | Role |
+|---|------|--------|------|
+| <img src="https://github.com/ysskrishna.png?size=120" width="60" height="60" alt="Y. Siva Sai Krishna"> | **Y. Siva Sai Krishna** | [@ysskrishna](https://github.com/ysskrishna) | Creator |
+
+## Changelog
+
+See [CHANGELOG](CHANGELOG.md) for release history.
+
 ## Support
 
 If you find this project helpful:
 
-- Star the [repository](https://github.com/ysskrishna/cron-gui)
-- [Report issues](https://github.com/ysskrishna/cron-gui/issues)
-- Submit pull requests
-- [Sponsor on GitHub](https://github.com/sponsors/ysskrishna)
-
-## Credits
-
-Forked from [crontab-ui](https://www.npmjs.com/package/crontab-ui) by [alseambusher](https://github.com/alseambusher).
+- ⭐ Star the repository
+- 🐛 [Report issues](https://github.com/ysskrishna/cron-gui/issues)
+- 🔀 Submit pull requests
+- 💝 [Sponsor on GitHub](https://github.com/sponsors/ysskrishna)
 
 ## License
 
@@ -191,5 +240,7 @@ MIT © [Y. Siva Sai Krishna](https://github.com/ysskrishna) — see [LICENSE](LI
   <a href="https://github.com/ysskrishna">Author's GitHub</a> •
   <a href="https://linkedin.com/in/ysskrishna">Author's LinkedIn</a> •
   <a href="https://ysskrishna.space">Author's site</a> •
+  <a href="https://www.npmjs.com/package/cron-gui">npm package</a> •
+  <a href="https://github.com/ysskrishna/cron-gui">repository</a> •
   <a href="https://github.com/ysskrishna/cron-gui/issues">Report Issues</a>
 </p>
