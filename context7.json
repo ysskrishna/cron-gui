@@ -1,0 +1,34 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "url": "https://context7.com/ysskrishna/cron-gui",
+  "public_key": "pk_VesXVq9WjBT8ecKU9XIZz",
+  "projectTitle": "Cron GUI",
+  "description": "Node.js web interface (npm cron-gui) for managing cron jobs without editing crontab by hand: create, edit, pause, run, back up and restore jobs, with per-job logs, Docker support and a migration path from crontab-ui.",
+  "excludeFolders": [
+    "archive",
+    "archived",
+    "old",
+    "deprecated",
+    "legacy",
+    "tests",
+    ".github",
+    "public",
+    "views",
+    "scripts",
+    "bin",
+    "config",
+    "middleware",
+    "crontabs"
+  ],
+  "excludeFiles": [
+    "CHANGELOG.md",
+    "changelog.md",
+    "LICENSE.md",
+    "license.md",
+    "CODE_OF_CONDUCT.md",
+    "NEWS.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "AGENTS.md"
+  ]
+}
