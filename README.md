@@ -14,6 +14,8 @@
   <a href="https://hub.docker.com/r/ysskrishna/cron-gui"><img src="https://img.shields.io/docker/pulls/ysskrishna/cron-gui.svg?style=flat-square" alt="Docker Pulls" /></a>
   <a href="https://nodejs.org/"><img src="https://img.shields.io/node/v/cron-gui.svg?style=flat-square" alt="Node" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/ysskrishna/cron-gui.svg?style=flat-square" alt="License: MIT" /></a>
+  <a href="https://context7.com/ysskrishna/cron-gui"><img src="https://img.shields.io/badge/Context7-docs-18181B?style=flat-square" alt="Context7" /></a>
+  <a href="https://deepwiki.com/ysskrishna/cron-gui"><img src="https://img.shields.io/badge/DeepWiki-ask-18181B?style=flat-square" alt="Ask DeepWiki" /></a>
 </p>
 
 Cron GUI is a drop-in successor to [crontab-ui](https://github.com/alseambusher/crontab-ui) with a rebuilt interface, safer deploy workflow, and dozens of bug fixes. Create, edit, pause, run, back up, and restore jobs from one place — then deploy to the system crontab when you are ready.
