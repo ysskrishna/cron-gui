@@ -3,7 +3,7 @@ name: Create Release
 on:
   push:
     tags:
-      - "v*"
+      - "v*.*.*"
 
 concurrency:
   group: create-release-${{ github.ref_name }}
@@ -33,32 +33,5 @@ jobs:
           tag: ${{ github.ref_name }}
           base-branch: main
 
-      - name: Extract changelog notes
-        id: notes
-        env:
-          TAG: ${{ github.ref_name }}
-        run: |
-          set -euo pipefail
-          VERSION="${TAG#v}"
-          NOTES=$(awk -v ver="$VERSION" '
-            $0 ~ "^## \\[" ver "\\]" { found=1; next }
-            found && /^## \[/ { exit }
-            found { print }
-          ' CHANGELOG.md | sed '/./,$!d')
-          if [ -z "$NOTES" ]; then
-            echo "::error::No CHANGELOG.md section for version $VERSION"
-            exit 1
-          fi
-          {
-            echo "body<<EOF"
-            printf '%s\n' "$NOTES"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Publish GitHub Release
-        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
-          body: ${{ steps.notes.outputs.body }}
-          draft: false
+      - name: Create GitHub release from changelog
+        uses: ysskrishna/changelog-release-action@v1
